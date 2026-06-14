@@ -62,6 +62,7 @@ import {
 } from "@tanstack/react-table"
 
 import { Badge } from "@/components/ui/badge"
+import { ZaloFollowBadge } from "@/components/zalo-follow-badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -195,7 +196,7 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
     accessorKey: "soDienThoai",
     header: "Liên hệ",
     cell: ({ row }) => (
-      <div className="min-w-40">
+      <div className="min-w-40 space-y-1">
         <div className="flex items-center gap-2 text-sm">
           <Phone className="h-3 w-3 text-muted-foreground" />
           {row.original.soDienThoai}
@@ -206,6 +207,7 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
             {row.original.email}
           </div>
         )}
+        <ZaloFollowBadge daQuanTamOA={row.original.daQuanTamOA} compact />
       </div>
     ),
   },

@@ -1,0 +1,11 @@
+docker-compose.yml
+.env.local
+.env.development.local
+README.md
+scripts/check-setup.js
+scripts/db-backup.sh
+scripts/db-restore.sh
+backups/
+openspec/
+.claude/
+.cursor/

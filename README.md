@@ -468,3 +468,69 @@ Project Link: [https://github.com/yourusername/demo-phong-tro](https://github.co
 - [Tailwind CSS](https://tailwindcss.com/)
 - [MongoDB](https://www.mongodb.com/)
 - [NextAuth.js](https://next-auth.js.org/)
+
+---
+
+## 📨 Cấu hình Zalo OA (gửi hóa đơn qua Zalo)
+
+Tính năng này cho phép gửi hóa đơn tự động qua Zalo Official Account cho khách thuê.
+
+### Bước 1: Đăng ký Zalo Official Account
+
+1. Vào https://oa.zalo.me/ → tạo OA dạng "Doanh nghiệp" (free)
+2. Vào https://developers.zalo.me/ → tạo app, link với OA vừa tạo
+3. Lấy `APP_ID`, `SECRET_KEY` từ trang app
+4. Vào tab "Official Account" → "Cấp quyền cho ứng dụng" → lấy `ACCESS_TOKEN` và `REFRESH_TOKEN` (token live 25h, hệ thống tự refresh)
+
+### Bước 2: Cấu hình env vars
+
+Trong `.env.local` (local) hoặc Vercel → Settings → Environment Variables (production):
+
+```env
+ZALO_OA_APP_ID=1234567890123456789
+ZALO_OA_SECRET_KEY=xxxxxxxxxxxxxxxxxxxx
+ZALO_OA_ACCESS_TOKEN=xxxxxxxxxxxxxxxxxxxx
+ZALO_OA_REFRESH_TOKEN=xxxxxxxxxxxxxxxxxxxx
+ZALO_OA_UID=lozido          # (optional) phần sau zalo.me/<uid>
+CRON_SECRET=random-secret    # cho Vercel cron auth
+```
+
+### Bước 3: Cấu hình webhook (Zalo developer console)
+
+- Webhook URL: `https://<your-domain>/api/zalo/webhook`
+- Event subscribe: `follow`, `unfollow`, `user_send_text`
+- Signature: HMAC SHA-256 của body với `SECRET_KEY` — đã được verify tự động
+
+### Bước 4: Cài đặt trong app
+
+1. Đăng nhập → sidebar **Cài đặt → Cài đặt phiếu thu**
+2. Đặt **Tên nhà trọ** (sẽ hiển thị trong tin Zalo)
+3. Bật **Gửi hóa đơn tự động qua Zalo**
+4. Đặt ngày lập hóa đơn, hạn đóng tiền, làm tròn, v.v.
+5. Bấm **Gửi xem trước** với số Zalo của bạn để test
+
+### Bước 5: Mời khách thuê quan tâm OA
+
+Mỗi khách thuê cần "Quan tâm" Zalo OA trước khi nhận được tin chủ động:
+
+- Vào trang **Khách thuê** → tìm khách có badge "Chưa quan tâm OA"
+- Bấm badge → sao chép link mời hoặc lấy QR → gửi cho khách
+- Khi khách bấm "Quan tâm", webhook `follow` sẽ map số điện thoại → `zaloUserId` tự động
+
+### Bước 6: Cron retry (cho tin failed/queued)
+
+- Vercel **Pro** plan: đã có sẵn cron mỗi 5 phút (file `vercel.json`)
+- Vercel **Hobby** plan: chỉ chạy 1 lần/ngày → khuyến nghị dùng [cron-job.org](https://cron-job.org/) (free) gọi `POST https://<your-domain>/api/zalo/retry` với header `Authorization: Bearer <CRON_SECRET>` mỗi 5 phút
+
+### Khung giờ giới hạn
+
+Zalo OA quy định **chỉ gửi tin chủ động trong 6h-22h** (giờ VN). Tin gửi ngoài giờ sẽ được queue và tự động retry khi đến giờ.
+
+### Theo dõi & debug
+
+- **Lịch sử Zalo**: sidebar **Vận hành → Lịch sử Zalo** — xem từng tin đã gửi, trạng thái (sent/failed/queued), lỗi chi tiết, nút **Gửi lại** cho tin failed
+- Mỗi entry click vào sẽ hiện **request payload** + **response payload** từ Zalo để debug
+
+### Tắt tính năng
+
+Vào **Lịch sử Zalo** → bấm nút **Tắt tính năng gửi hóa đơn qua ZALO** (master switch) — hóa đơn tạo mới sẽ không gửi Zalo tự động nữa, nhưng có thể gửi thủ công từng tin.

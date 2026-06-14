@@ -291,8 +291,35 @@ export async function POST(request: NextRequest) {
     await hoaDon.populate([
       { path: 'hopDong', select: 'maHopDong' },
       { path: 'phong', select: 'maPhong' },
-      { path: 'khachThue', select: 'hoTen soDienThoai' }
+      { path: 'khachThue', select: 'hoTen soDienThoai zaloUserId' }
     ]);
+
+    // Hook tự động gửi Zalo (fire-and-forget) — không block response.
+    // Nếu Zalo lỗi cũng không ảnh hưởng tới việc tạo hóa đơn.
+    (async () => {
+      try {
+        const { getCaiDatHoaDonLean } = await import('@/lib/cai-dat');
+        const settings = await getCaiDatHoaDonLean();
+
+        if (!settings.autoSendZalo) return;
+        const kt = hoaDon.khachThue as unknown as { _id: unknown; hoTen: string; zaloUserId?: string };
+        if (!kt?.zaloUserId) return;
+
+        const { sendInvoiceMessage } = await import('@/lib/zalo');
+        await sendInvoiceMessage({
+          hoaDon: hoaDon.toObject() as unknown as Parameters<typeof sendInvoiceMessage>[0]['hoaDon'],
+          khachThue: { ...kt, _id: String(kt._id) } as Parameters<typeof sendInvoiceMessage>[0]['khachThue'],
+          settings: { ghiChuMacDinh: settings.ghiChuMacDinh, hienMaQR: settings.hienMaQR },
+          trigger: 'auto',
+          recipientType: 'tenant',
+          recipientZaloUserId: kt.zaloUserId,
+          phongId: String(hoaDon.phong),
+          tenNhaTro: (settings as { tenNhaTro?: string }).tenNhaTro || 'Nhà trọ',
+        });
+      } catch (err) {
+        console.error('Auto-send Zalo failed:', err);
+      }
+    })();
 
     return NextResponse.json({
       success: true,

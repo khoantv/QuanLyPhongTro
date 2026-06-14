@@ -16,6 +16,8 @@ export interface IKhachThue extends Document {
   ngheNghiep?: string;
   matKhau?: string;
   trangThai: 'dangThue' | 'daTraPhong' | 'chuaThue';
+  zaloUserId?: string;
+  daQuanTamOA: boolean;
   ngayTao: Date;
   ngayCapNhat: Date;
 }
@@ -91,7 +93,17 @@ const KhachThueSchema = new Schema<IKhachThue>({
     type: String,
     enum: ['dangThue', 'daTraPhong', 'chuaThue'],
     default: 'chuaThue'
-  }
+  },
+  zaloUserId: {
+    type: String,
+    trim: true,
+    default: null,
+    sparse: true,
+  },
+  daQuanTamOA: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: { createdAt: 'ngayTao', updatedAt: 'ngayCapNhat' }
 });

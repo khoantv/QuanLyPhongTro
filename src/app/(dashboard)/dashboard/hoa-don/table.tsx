@@ -519,19 +519,33 @@ export function HoaDonDataTable(props: HoaDonDataTableProps) {
               ))}
             </SelectContent>
           </Select>
-          <Select value={yearFilter} onValueChange={onYearChange}>
-            <SelectTrigger className="w-full sm:w-[100px]">
-              <SelectValue placeholder="Năm" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả</SelectItem>
+          <div className="flex items-center gap-1 w-full sm:w-[140px]">
+            <Input
+              type="number"
+              min={2000}
+              max={2099}
+              list="hoa-don-year-suggestions"
+              placeholder="Năm"
+              value={yearFilter === 'all' ? '' : yearFilter}
+              onChange={(e) => onYearChange?.(e.target.value.trim() === '' ? 'all' : e.target.value.trim())}
+              className="text-sm"
+            />
+            <datalist id="hoa-don-year-suggestions">
               {getYearOptions?.().map((year) => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
-                </SelectItem>
+                <option key={year} value={year.toString()} />
               ))}
-            </SelectContent>
-          </Select>
+            </datalist>
+            {yearFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => onYearChange?.('all')}
+                className="text-xs text-muted-foreground hover:text-foreground px-1"
+                title="Xóa lọc năm"
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Tùy chỉnh cột bên phải */}

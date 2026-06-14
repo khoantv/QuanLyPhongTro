@@ -245,7 +245,7 @@ export default function HopDongPage() {
       const response = await fetch(`/api/hop-dong/${id}`, {
         method: 'DELETE',
       });
-      
+
       if (response.ok) {
         // Xóa cache
         cache.clearCache();
@@ -257,6 +257,26 @@ export default function HopDongPage() {
     } catch (error) {
       console.error('Error deleting hop dong:', error);
       toast.error('Có lỗi xảy ra khi xóa hợp đồng');
+    }
+  };
+
+  const handleClone = async (hopDong: HopDong) => {
+    try {
+      const response = await fetch(`/api/hop-dong/${hopDong._id}/clone`, {
+        method: 'POST',
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        cache.clearCache();
+        await fetchData(true);
+        toast.success(result.message || 'Nhân bản hợp đồng thành công!');
+      } else {
+        toast.error(result.message || 'Có lỗi xảy ra khi nhân bản hợp đồng');
+      }
+    } catch (error) {
+      console.error('Error cloning hop dong:', error);
+      toast.error('Có lỗi xảy ra khi nhân bản hợp đồng');
     }
   };
 
@@ -1169,6 +1189,7 @@ export default function HopDongPage() {
             onDownload={handleDownload}
             onGiaHan={handleGiaHan}
             onHuy={handleHuy}
+            onClone={handleClone}
             actionLoading={actionLoading}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}

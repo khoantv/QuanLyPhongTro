@@ -201,6 +201,26 @@ export default function PhongPage() {
     }
   };
 
+  const handleClone = async (phong: Phong) => {
+    try {
+      const response = await fetch(`/api/phong/${phong._id}/clone`, {
+        method: 'POST',
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        cache.clearCache();
+        await fetchPhong(true);
+        toast.success(result.message || 'Nhân bản phòng thành công!');
+      } else {
+        toast.error(result.message || 'Có lỗi xảy ra khi nhân bản phòng');
+      }
+    } catch (error) {
+      console.error('Error cloning phong:', error);
+      toast.error('Có lỗi xảy ra khi nhân bản phòng');
+    }
+  };
+
   const handleViewImages = (phong: Phong) => {
     if (phong.anhPhong && phong.anhPhong.length > 0) {
       setViewingImages(phong.anhPhong);
@@ -347,11 +367,12 @@ export default function PhongPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <PhongDataTable 
+          <PhongDataTable
             data={filteredPhong}
             toaNhaList={toaNhaList}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onClone={handleClone}
             onViewImages={handleViewImages}
             onViewTenants={handleViewTenants}
             searchTerm={searchTerm}
@@ -564,6 +585,15 @@ export default function PhongPage() {
                         >
                           <Edit className="h-3.5 w-3.5 mr-1" />
                           Sửa
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleClone(phong)}
+                          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          title="Nhân bản phòng"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
                         </Button>
                         <DeleteConfirmPopover
                           onConfirm={() => handleDelete(phong._id!)}

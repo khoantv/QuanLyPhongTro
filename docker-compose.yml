@@ -1,0 +1,63 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: qlpt-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: quanlyphongtro
+    volumes:
+      - mongodb_data:/data/db
+
+  mongo-express:
+    image: mongo-express:1
+    container_name: qlpt-mongo-express
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin@mongodb:27017/
+      ME_CONFIG_BASICAUTH: "false"
+
+  mongo-backup:
+    image: mongo:7
+    container_name: qlpt-mongo-backup
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    volumes:
+      - ./backups:/backups
+    environment:
+      BACKUP_INTERVAL_SECONDS: "86400"
+      BACKUP_KEEP_LAST: "7"
+      MONGO_URI: "mongodb://admin:admin@mongodb:27017/quanlyphongtro?authSource=admin"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        sleep 15
+        while true; do
+          TS=$$(date +%Y%m%d-%H%M%S)
+          OUT="/backups/auto-$$TS.archive.gz"
+          echo "[mongo-backup] Dumping → $$OUT"
+          if mongodump --uri="$$MONGO_URI" --archive="$$OUT" --gzip; then
+            echo "[mongo-backup] OK ($$(du -h $$OUT | cut -f1))"
+          else
+            echo "[mongo-backup] FAILED, sẽ thử lại sau"
+            rm -f "$$OUT"
+          fi
+          # Giữ N bản gần nhất
+          ls -1t /backups/auto-*.archive.gz 2>/dev/null | tail -n +$$((BACKUP_KEEP_LAST + 1)) | xargs -r rm -f
+          sleep "$$BACKUP_INTERVAL_SECONDS"
+        done
+
+volumes:
+  mongodb_data:

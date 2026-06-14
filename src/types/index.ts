@@ -92,6 +92,8 @@ export interface KhachThue {
   ngheNghiep?: string;
   matKhau?: string;
   trangThai: 'dangThue' | 'daTraPhong' | 'chuaThue';
+  zaloUserId?: string;
+  daQuanTamOA?: boolean;
   ngayTao: Date;
   ngayCapNhat: Date;
   hopDongHienTai?: {
@@ -105,6 +107,67 @@ export interface KhachThue {
       };
     };
   };
+}
+
+export type HinhThucThanhToan = 'tienMat' | 'chuyenKhoan' | 'momo' | 'vnpay' | 'khac';
+
+export interface CaiDatHoaDon {
+  _id?: string;
+  singleton?: true;
+  tenNhaTro: string;
+  ngayLapHoaDon: number | null;
+  hanDongTien: number;
+  autoSendZalo: boolean;
+  hienMaQR: boolean;
+  phanLoaiThuChi: boolean;
+  lamTronHoaDon: boolean;
+  hinhThucThanhToanMacDinh: HinhThucThanhToan;
+  ghiChuMacDinh: string;
+  ngayTao?: Date;
+  ngayCapNhat?: Date;
+}
+
+export type ZaloLogStatus = 'queued' | 'sent' | 'failed' | 'failed_permanent' | 'skipped';
+export type ZaloLogTrigger = 'auto' | 'manual' | 'preview' | 'retry';
+export type ZaloRecipientType = 'tenant' | 'owner_preview';
+
+export interface ZaloMessageLog {
+  _id?: string;
+  hoaDonId?: string | { _id: string; maHoaDon: string } | null;
+  khachThueId?: string | { _id: string; hoTen: string; soDienThoai?: string } | null;
+  phongId?: string | { _id: string; maPhong: string } | null;
+  recipientType: ZaloRecipientType;
+  recipientZaloUserId: string;
+  trigger: ZaloLogTrigger;
+  status: ZaloLogStatus;
+  sentAt: Date | string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  zaloMessageId: string | null;
+  retryCount: number;
+  nextRetryAt: Date | string | null;
+  requestPayload?: Record<string, unknown>;
+  responsePayload?: Record<string, unknown> | null;
+  ngayTao?: Date | string;
+  ngayCapNhat?: Date | string;
+}
+
+export type LoaiPhuongTien = 'xeMay' | 'oTo' | 'xeDap' | 'xeDien' | 'khac';
+
+export interface PhuongTien {
+  _id?: string;
+  khachThue: string | {
+    _id: string;
+    hoTen: string;
+    soDienThoai?: string;
+  };
+  tenXe: string;
+  bienSo: string;
+  loaiXe: LoaiPhuongTien;
+  hinhAnh: string[];
+  moTa?: string;
+  ngayTao: Date;
+  ngayCapNhat: Date;
 }
 
 export interface HopDong {

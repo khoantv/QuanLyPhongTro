@@ -44,6 +44,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# database backups (local)
+/backups/*.archive.gz
+!/backups/.gitkeep
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

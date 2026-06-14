@@ -40,6 +40,7 @@ import {
   Loader,
   Plus,
   Search,
+  Copy,
 } from "lucide-react"
 import {
   ColumnDef,
@@ -161,6 +162,7 @@ type HopDongTableProps = {
   onDownload: (hopDong: HopDong) => void
   onGiaHan: (hopDong: HopDong) => void
   onHuy: (hopDong: HopDong) => void
+  onClone?: (hopDong: HopDong) => void
   actionLoading: string | null
 }
 
@@ -334,6 +336,12 @@ const createColumns = (props: HopDongTableProps): ColumnDef<HopDong>[] => [
             <Download className="mr-2 h-4 w-4" />
             Tải xuống
           </DropdownMenuItem>
+          {props.onClone && (
+            <DropdownMenuItem onClick={() => props.onClone!(row.original)}>
+              <Copy className="mr-2 h-4 w-4" />
+              Nhân bản
+            </DropdownMenuItem>
+          )}
           {row.original.trangThai === 'hoatDong' && (
             <>
               <DropdownMenuSeparator />

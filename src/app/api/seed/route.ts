@@ -16,13 +16,13 @@ export async function POST(request: NextRequest) {
       // Vietnamese fields
       ten: 'Admin',
       email: 'admin@example.com',
-      matKhau: '123456',
+      matKhau: 'admin123',
       soDienThoai: '0326132124',
       vaiTro: 'admin',
       trangThai: 'hoatDong',
       // English fields (required for compatibility)
       name: 'Admin',
-      password: '123456',
+      password: 'admin123',
       phone: '0326132124',
       role: 'admin',
       isActive: true,

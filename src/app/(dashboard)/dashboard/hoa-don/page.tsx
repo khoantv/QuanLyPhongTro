@@ -97,8 +97,8 @@ export default function HoaDonPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [monthFilter, setMonthFilter] = useState<string>('all');
-  const [yearFilter, setYearFilter] = useState<string>('all');
+  const [monthFilter, setMonthFilter] = useState<string>(() => String(new Date().getMonth() + 1));
+  const [yearFilter, setYearFilter] = useState<string>(() => String(new Date().getFullYear()));
   const [isAutoCreating, setIsAutoCreating] = useState(false);
   const [viewingHoaDon, setViewingHoaDon] = useState<HoaDon | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -210,7 +210,7 @@ export default function HoaDonPage() {
 
   const getYearOptions = () => {
     const currentYear = new Date().getFullYear();
-    return Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+    return Array.from({ length: 7 }, (_, i) => currentYear - 3 + i);
   };
 
   const handleEdit = (hoaDon: HoaDon) => {
@@ -735,19 +735,33 @@ export default function HoaDonPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Năm" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-sm">Tất cả</SelectItem>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min={2000}
+                max={2099}
+                list="hoa-don-year-suggestions-mobile"
+                placeholder="Năm"
+                value={yearFilter === 'all' ? '' : yearFilter}
+                onChange={(e) => setYearFilter(e.target.value.trim() === '' ? 'all' : e.target.value.trim())}
+                className="text-sm"
+              />
+              <datalist id="hoa-don-year-suggestions-mobile">
                 {getYearOptions().map(year => (
-                  <SelectItem key={year} value={year.toString()} className="text-sm">
-                    {year}
-                  </SelectItem>
+                  <option key={year} value={year.toString()} />
                 ))}
-              </SelectContent>
-            </Select>
+              </datalist>
+              {yearFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setYearFilter('all')}
+                  className="text-xs text-muted-foreground hover:text-foreground px-1"
+                  title="Xóa lọc năm"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

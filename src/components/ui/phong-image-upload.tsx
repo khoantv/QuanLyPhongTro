@@ -6,19 +6,38 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, Image as ImageIcon, Loader2, Home } from 'lucide-react';
 import { toast } from 'sonner';
+import type { LucideIcon } from 'lucide-react';
 
 interface PhongImageUploadProps {
   images: string[];
   onImagesChange: (images: string[]) => void;
   className?: string;
   maxImages?: number;
+  /** Tiêu đề hiển thị (mặc định: "Ảnh phòng") */
+  title?: string;
+  /** Icon tiêu đề (mặc định: Home) */
+  icon?: LucideIcon;
+  /** Text khi chưa có ảnh (mặc định: "Chưa có ảnh phòng nào") */
+  emptyText?: string;
+  /** Text gợi ý dưới empty state */
+  emptyHelpText?: string;
+  /** Prefix cho alt của ảnh (mặc định: "Phòng") */
+  altPrefix?: string;
+  /** Label đơn vị ảnh, dùng cho badge cuối (mặc định: "ảnh phòng") */
+  unitLabel?: string;
 }
 
-export function PhongImageUpload({ 
-  images, 
-  onImagesChange, 
+export function PhongImageUpload({
+  images,
+  onImagesChange,
   className = '',
-  maxImages = 10
+  maxImages = 10,
+  title = 'Ảnh phòng',
+  icon: Icon = Home,
+  emptyText = 'Chưa có ảnh phòng nào',
+  emptyHelpText = 'Click "Thêm ảnh" để upload ảnh minh họa phòng',
+  altPrefix = 'Phòng',
+  unitLabel = 'ảnh phòng',
 }: PhongImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -88,8 +107,8 @@ export function PhongImageUpload({
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-center gap-2">
-        <Home className="h-5 w-5 text-blue-600" />
-        <h3 className="text-lg font-medium">Ảnh phòng</h3>
+        <Icon className="h-5 w-5 text-blue-600" />
+        <h3 className="text-lg font-medium">{title}</h3>
         <Badge variant="secondary" className="text-xs">
           {images.length}/{maxImages} ảnh
         </Badge>
@@ -141,7 +160,7 @@ export function PhongImageUpload({
                 <div className="relative aspect-square rounded-md overflow-hidden bg-gray-100">
                   <img
                     src={imageUrl}
-                    alt={`Phòng ${index + 1}`}
+                    alt={`${altPrefix} ${index + 1}`}
                     className="w-full h-full object-cover"
                   />
                   <Button
@@ -163,10 +182,10 @@ export function PhongImageUpload({
           <CardContent className="flex flex-col items-center justify-center py-8">
             <ImageIcon className="h-12 w-12 text-gray-400 mb-3" />
             <p className="text-gray-500 text-sm text-center">
-              Chưa có ảnh phòng nào
+              {emptyText}
             </p>
             <p className="text-xs text-gray-400 text-center mt-1">
-              Click "Thêm ảnh" để upload ảnh minh họa phòng
+              {emptyHelpText}
             </p>
           </CardContent>
         </Card>
@@ -178,9 +197,9 @@ export function PhongImageUpload({
           variant={images.length > 0 ? "default" : "secondary"} 
           className="text-xs"
         >
-          {images.length > 0 
-            ? `Đã upload ${images.length} ảnh phòng` 
-            : 'Chưa có ảnh phòng'
+          {images.length > 0
+            ? `Đã upload ${images.length} ${unitLabel}`
+            : `Chưa có ${unitLabel}`
           }
         </Badge>
       </div>

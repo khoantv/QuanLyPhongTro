@@ -41,6 +41,7 @@ import {
   Search,
   User,
   Users,
+  Copy,
 } from "lucide-react"
 import {
   ColumnDef,
@@ -156,6 +157,7 @@ type PhongTableProps = {
   onView?: (phong: Phong) => void
   onEdit: (phong: Phong) => void
   onDelete: (id: string) => void
+  onClone?: (phong: Phong) => void
   onViewImages?: (phong: Phong) => void
   onViewTenants?: (phong: Phong) => void
 }
@@ -368,6 +370,12 @@ const createColumns = (props: PhongTableProps): ColumnDef<Phong>[] => [
             <Edit className="mr-2 h-4 w-4" />
             Chỉnh sửa
           </DropdownMenuItem>
+          {props.onClone && (
+            <DropdownMenuItem onClick={() => props.onClone!(row.original)}>
+              <Copy className="mr-2 h-4 w-4" />
+              Nhân bản
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             className="text-destructive"
