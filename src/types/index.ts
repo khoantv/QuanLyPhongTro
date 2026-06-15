@@ -154,6 +154,26 @@ export interface ZaloMessageLog {
 
 export type LoaiPhuongTien = 'xeMay' | 'oTo' | 'xeDap' | 'xeDien' | 'khac';
 
+export type LoaiGanKetTaiSan = 'phong' | 'chung';
+
+export interface TaiSan {
+  _id?: string;
+  ten: string;
+  icon: string;
+  giaTri: number;
+  giaNhap?: number | null;
+  tongSoLuong: number;
+  donVi: string;
+  donViCungCap?: string;
+  loaiGanKet: LoaiGanKetTaiSan;
+  phong?: string | { _id: string; maPhong: string } | null;
+  toaNha?: string | { _id: string; tenToaNha: string } | null;
+  moTa?: string;
+  ngayMua?: Date | string | null;
+  ngayTao?: Date | string;
+  ngayCapNhat?: Date | string;
+}
+
 export interface PhuongTien {
   _id?: string;
   khachThue: string | {
