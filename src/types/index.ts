@@ -273,6 +273,38 @@ export interface ThanhToan {
   ngayTao: Date;
 }
 
+export type LoaiThuChi = 'thu' | 'chi';
+export type PhuongThucThuChi = 'tienMat' | 'chuyenKhoan';
+
+export interface DanhMucThuChi {
+  _id?: string;
+  ten: string;
+  loai: LoaiThuChi;
+  key?: string | null;
+  icon?: string;
+  heThong: boolean;
+  choPhepSua: boolean;
+  thuTu: number;
+  ngayTao?: Date | string;
+  ngayCapNhat?: Date | string;
+}
+
+export interface PhieuThuChi {
+  _id?: string;
+  loai: LoaiThuChi;
+  soTien: number;
+  phuongThuc: PhuongThucThuChi;
+  nguoiThanhToan: string;
+  noiDung: string;
+  danhMuc: string | { _id: string; ten: string; loai: LoaiThuChi; key?: string | null };
+  ngayLapPhieu: Date | string;
+  tuDongTaoHangThang: boolean;
+  toaNha?: string | { _id: string; tenToaNha: string } | null;
+  nguoiTao?: string | null;
+  ngayTao?: Date | string;
+  ngayCapNhat?: Date | string;
+}
+
 export interface SuCo {
   _id?: string;
   phong: string; // ObjectId ref Phong
