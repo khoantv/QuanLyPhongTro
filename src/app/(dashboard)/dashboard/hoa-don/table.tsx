@@ -131,10 +131,10 @@ const getStatusBadge = (status: string) => {
   }
 }
 
-const isOverdue = (hanThanhToan: Date | string) => {
-  const today = new Date()
-  const dueDate = new Date(hanThanhToan)
-  return dueDate < today
+// Hóa đơn đã thanh toán đủ thì không bao giờ tính là quá hạn
+const isOverdue = (hanThanhToan: Date | string, trangThai?: string) => {
+  if (trangThai === 'daThanhToan') return false
+  return new Date(hanThanhToan) < new Date()
 }
 
 // Create a separate component for the drag handle
@@ -260,7 +260,7 @@ const createColumns = (props: HoaDonTableProps): ColumnDef<HoaDon>[] => [
     accessorKey: "hanThanhToan",
     header: "Hạn thanh toán",
     cell: ({ row }) => {
-      const isLate = isOverdue(row.original.hanThanhToan)
+      const isLate = isOverdue(row.original.hanThanhToan, row.original.trangThai)
       return (
         <div className="text-sm">
           <div className={isLate ? 'text-orange-600 font-medium' : ''}>

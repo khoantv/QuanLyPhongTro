@@ -89,7 +89,7 @@ export default function HoaDonPage() {
     hopDongList: HopDong[];
     phongList: Phong[];
     khachThueList: KhachThue[];
-  }>({ key: 'hoa-don-data', duration: 300000 }); // 5 phút
+  }>({ key: 'hoa-don-data-v2', duration: 300000 }); // 5 phút — v2: bỏ cache cũ chỉ có 10 hóa đơn
   
   const [hoaDonList, setHoaDonList] = useState<HoaDon[]>([]);
   const [hopDongList, setHopDongList] = useState<HopDong[]>([]);
@@ -138,7 +138,8 @@ export default function HoaDonPage() {
       }
       
       // Fetch hóa đơn từ API
-      const hoaDonResponse = await fetch('/api/hoa-don');
+      // Trang lọc theo tháng/năm ở client nên cần lấy toàn bộ hóa đơn (API mặc định chỉ trả 10)
+      const hoaDonResponse = await fetch('/api/hoa-don?limit=10000');
       const hoaDonData = hoaDonResponse.ok ? await hoaDonResponse.json() : { data: [] };
       const hoaDons = hoaDonData.data || [];
       setHoaDonList(hoaDons);
@@ -664,7 +665,7 @@ export default function HoaDonPage() {
             <div>
               <p className="text-[10px] md:text-xs font-medium text-gray-600">Quá hạn</p>
               <p className="text-base md:text-2xl font-bold text-orange-600">
-                {hoaDonList.filter(h => new Date(h.hanThanhToan) < new Date()).length}
+                {hoaDonList.filter(h => h.trangThai !== 'daThanhToan' && new Date(h.hanThanhToan) < new Date()).length}
               </p>
             </div>
             <AlertCircle className="h-3 w-3 md:h-4 md:w-4 text-orange-600" />
