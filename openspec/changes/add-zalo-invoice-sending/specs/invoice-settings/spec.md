@@ -7,7 +7,7 @@ Hệ thống SHALL lưu cấu hình phiếu thu/hóa đơn dưới dạng single
 #### Scenario: Lần đầu truy cập trang cài đặt
 
 - **WHEN** người dùng admin mở `/dashboard/cai-dat-hoa-don` và chưa có record cấu hình
-- **THEN** hệ thống tạo record mới với defaults (`ngayLapHoaDon=null → cuối tháng`, `hanDongTien=5`, `lamTronHoaDon=true`, `hienMaQR=true`, `autoSendZalo=false`, `hinhThucThanhToanMacDinh='tienMat'`, `ghiChuMacDinh=''`) và trả về cho client
+- **THEN** hệ thống tạo record mới với defaults (`ngayLapHoaDon=null → cuối tháng`, `hanDongTien=5`, `lamTronHoaDon=false`, `hienMaQR=true`, `autoSendZalo=false`, `hinhThucThanhToanMacDinh='tienMat'`, `ghiChuMacDinh=''`) và trả về cho client
 
 #### Scenario: Cập nhật cấu hình
 

@@ -43,7 +43,7 @@ const CaiDatHoaDonSchema = new Schema<ICaiDatHoaDon>({
   autoSendZalo: { type: Boolean, default: false },
   hienMaQR: { type: Boolean, default: true },
   phanLoaiThuChi: { type: Boolean, default: false },
-  lamTronHoaDon: { type: Boolean, default: true },
+  lamTronHoaDon: { type: Boolean, default: false },
   hinhThucThanhToanMacDinh: {
     type: String,
     enum: ['tienMat', 'chuyenKhoan', 'momo', 'vnpay', 'khac'],
