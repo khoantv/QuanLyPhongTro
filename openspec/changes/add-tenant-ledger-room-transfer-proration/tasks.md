@@ -2,7 +2,7 @@
 
 - [x] 1.1 Chốt các Open Questions trong `design.md` với chủ trọ (thu trước/sau, chia ngày thực tế/30, phí dịch vụ khi tính lẻ, giữ ngày thu khi chuyển phòng)
 - [ ] 1.2 Backup DB (`npm run db:backup`)
-- [ ] 1.3 Thêm dependency `exceljs`
+- [x] 1.3 Thêm dependency `exceljs`
 
 ## 2. M1 — Sổ công nợ (tenant-ledger)
 
@@ -50,19 +50,19 @@
 
 ## 5. M4 — Bảng thu tiền tháng (monthly-collection-sheet)
 
-- [ ] 5.1 `GET /api/bang-thu-tien` (gộp phòng, hợp đồng, chỉ số, hóa đơn, thanh toán trong kỳ; tính Đã đóng / Còn thiếu)
-- [ ] 5.2 `POST /api/bang-thu-tien/chi-so` (upsert hàng loạt, trả danh sách lỗi)
-- [ ] 5.3 `POST /api/bang-thu-tien/lap-hoa-don` (lập hàng loạt qua `lap-hoa-don.ts`)
-- [ ] 5.4 `GET /api/bang-thu-tien/export` (xlsx bằng `exceljs`, màu nền theo trạng thái, dòng tổng)
-- [ ] 5.5 Trang `/dashboard/bang-thu-tien`: bộ lọc tòa nhà/tháng/tìm kiếm, bảng cột cố định, ô nhập chỉ số inline, dòng tổng, màu trạng thái, dialog Thu tiền
-- [ ] 5.6 Thêm link "Bảng thu tiền" vào sidebar
-- [ ] 5.7 Đối chiếu: nhập dữ liệu bảng Excel mẫu tháng 10 vào DB thử, so sánh từng dòng Cần đóng / Còn thiếu
+- [x] 5.1 `GET /api/bang-thu-tien` (gộp phòng, hợp đồng, chỉ số, hóa đơn, thanh toán trong kỳ; tính Đã đóng / Còn thiếu)
+- [x] 5.2 `POST /api/bang-thu-tien/chi-so` (upsert hàng loạt, trả danh sách lỗi)
+- [x] 5.3 `POST /api/bang-thu-tien/lap-hoa-don` (lập hàng loạt qua `lap-hoa-don.ts`)
+- [x] 5.4 `GET /api/bang-thu-tien/export` (xlsx bằng `exceljs`, màu nền theo trạng thái, dòng tổng)
+- [x] 5.5 Trang `/dashboard/bang-thu-tien`: bộ lọc tòa nhà/tháng/tìm kiếm, bảng cột cố định, ô nhập chỉ số inline, dòng tổng, màu trạng thái, dialog Thu tiền
+- [x] 5.6 Thêm link "Bảng thu tiền" vào sidebar
+- [x] 5.7 Đối chiếu: nhập dữ liệu bảng Excel mẫu tháng 10 vào DB thử, so sánh từng dòng Cần đóng / Còn thiếu
 
 ## 6. Verification
 
 - [ ] 6.1 `npm run build` và `npm run lint` xanh
 - [ ] 6.2 Chạy `scripts/migrate-cong-no.ts --dry-run` trên bản sao dữ liệu thật, rà báo cáo chênh lệch
-- [ ] 6.3 Manual test: đóng thiếu → tháng sau hiện nợ kỳ trước; đóng thừa → tháng sau trừ; đóng trước khi chưa có hóa đơn
+- [x] 6.3 Manual test: đóng thiếu → tháng sau hiện nợ kỳ trước; đóng thừa → tháng sau trừ; đóng trước khi chưa có hóa đơn
 - [x] 6.4 Manual test: khách mới vào giữa kỳ → hóa đơn đầu có tiền phòng lẻ đúng
 - [x] 6.5 Manual test: chuyển phòng giữa kỳ và trước kỳ thu đầu; trả phòng có/không hoàn tiền phòng, có trừ cọc
 - [x] 6.6 Manual test: auto-invoice với hai nhóm ngày thu 10 và 21
