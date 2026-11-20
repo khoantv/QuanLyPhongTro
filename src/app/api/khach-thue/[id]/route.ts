@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import KhachThue from '@/models/KhachThue';
 import { z } from 'zod';
+import { demDuLieuLienQuan, moTaDuLieuLienQuan } from '@/lib/khach-thue/tai-khoan';
 
 const khachThueSchema = z.object({
   hoTen: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự'),
@@ -98,7 +99,7 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       ...validatedData,
       ngaySinh: new Date(validatedData.ngaySinh),
       anhCCCD: validatedData.anhCCCD || { matTruoc: '', matSau: '' },
@@ -186,6 +187,17 @@ export async function DELETE(
       return NextResponse.json(
         { message: 'Khách thuê không tồn tại' },
         { status: 404 }
+      );
+    }
+
+    // Không cho xóa khách đã có dữ liệu — xóa sẽ làm hóa đơn, hợp đồng, công nợ cũ mất thông tin khách
+    const duLieu = moTaDuLieuLienQuan(await demDuLieuLienQuan(id));
+    if (duLieu) {
+      return NextResponse.json(
+        {
+          message: `Không thể xóa ${khachThue.hoTen} vì đã có ${duLieu}. Hãy dùng "Khóa tài khoản" để chặn đăng nhập mà vẫn giữ lịch sử.`,
+        },
+        { status: 409 }
       );
     }
 

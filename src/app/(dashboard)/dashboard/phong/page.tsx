@@ -72,7 +72,7 @@ export default function PhongPage() {
   const [viewingImages, setViewingImages] = useState<string[]>([]);
   const [viewingPhongName, setViewingPhongName] = useState('');
   const [isTenantsViewerOpen, setIsTenantsViewerOpen] = useState(false);
-  const [viewingTenants, setViewingTenants] = useState<any[]>([]);
+  const [viewingTenants, setViewingTenants] = useState<NonNullable<Phong['hopDongHienTai']>['khachThueId']>([]);
   const [viewingTenantsPhongName, setViewingTenantsPhongName] = useState('');
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function PhongPage() {
       if (selectedTrangThai && selectedTrangThai !== 'all') params.append('trangThai', selectedTrangThai);
       
       // Fetch phong
-      const response = await fetch(`/api/phong?${params.toString()}&limit=100`);
+      const response = await fetch(`/api/phong?${params.toString()}&limit=10000`);
       let phongData: Phong[] = [];
       if (response.ok) {
         const result = await response.json();
@@ -115,7 +115,7 @@ export default function PhongPage() {
       }
       
       // Fetch toa nha
-      const toaNhaResponse = await fetch('/api/toa-nha');
+      const toaNhaResponse = await fetch('/api/toa-nha?limit=10000');
       let toaNhaData: ToaNha[] = [];
       if (toaNhaResponse.ok) {
         const toaNhaResult = await toaNhaResponse.json();
@@ -141,7 +141,7 @@ export default function PhongPage() {
 
   const fetchToaNha = async () => {
     try {
-      const response = await fetch('/api/toa-nha');
+      const response = await fetch('/api/toa-nha?limit=10000');
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -233,7 +233,7 @@ export default function PhongPage() {
   };
 
   const handleViewTenants = (phong: Phong) => {
-    const phongData = phong as any;
+    const phongData = phong;
     const hopDong = phongData.hopDongHienTai;
     
     if (hopDong && hopDong.khachThueId && hopDong.khachThueId.length > 0) {
@@ -499,7 +499,7 @@ export default function PhongPage() {
 
                     {/* Thông tin người thuê */}
                     {(() => {
-                      const phongData = phong as any;
+                      const phongData = phong;
                       const hopDong = phongData.hopDongHienTai;
                       
                       if (hopDong && hopDong.khachThueId && hopDong.khachThueId.length > 0) {

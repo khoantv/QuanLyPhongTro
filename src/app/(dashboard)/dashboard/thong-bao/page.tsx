@@ -93,25 +93,25 @@ export default function ThongBaoPage() {
       }
       
       // Fetch thông báo từ API
-      const thongBaoResponse = await fetch('/api/thong-bao');
+      const thongBaoResponse = await fetch('/api/thong-bao?limit=10000');
       const thongBaoData = thongBaoResponse.ok ? await thongBaoResponse.json() : { data: [] };
       const thongBaos = thongBaoData.success ? thongBaoData.data : [];
       setThongBaoList(thongBaos);
 
       // Fetch tòa nhà từ API
-      const toaNhaResponse = await fetch('/api/toa-nha');
+      const toaNhaResponse = await fetch('/api/toa-nha?limit=10000');
       const toaNhaData = toaNhaResponse.ok ? await toaNhaResponse.json() : { data: [] };
       const toaNhas = toaNhaData.success ? toaNhaData.data : [];
       setToaNhaList(toaNhas);
 
       // Fetch phòng từ API
-      const phongResponse = await fetch('/api/phong');
+      const phongResponse = await fetch('/api/phong?limit=10000');
       const phongData = phongResponse.ok ? await phongResponse.json() : { data: [] };
       const phongs = phongData.success ? phongData.data : [];
       setPhongList(phongs);
 
       // Fetch khách thuê từ API
-      const khachThueResponse = await fetch('/api/khach-thue');
+      const khachThueResponse = await fetch('/api/khach-thue?limit=10000');
       const khachThueData = khachThueResponse.ok ? await khachThueResponse.json() : { data: [] };
       const khachThues = khachThueData.success ? khachThueData.data : [];
       setKhachThueList(khachThues);
@@ -703,7 +703,7 @@ function ThongBaoForm({
 
       <div className="space-y-2">
         <Label htmlFor="loai" className="text-xs md:text-sm">Loại thông báo</Label>
-        <Select value={formData.loai} onValueChange={(value) => setFormData(prev => ({ ...prev, loai: value as any }))}>
+        <Select value={formData.loai} onValueChange={(value) => setFormData(prev => ({ ...prev, loai: value as ThongBao['loai'] }))}>
           <SelectTrigger className="text-sm">
             <SelectValue placeholder="Chọn loại thông báo" />
           </SelectTrigger>

@@ -95,25 +95,25 @@ export default function HopDongPage() {
       }
       
       // Fetch hop dong data
-      const hopDongResponse = await fetch('/api/hop-dong?limit=100');
+      const hopDongResponse = await fetch('/api/hop-dong?limit=10000');
       const hopDongData = hopDongResponse.ok ? await hopDongResponse.json() : { data: [] };
       const hopDongs = hopDongData.data || [];
       setHopDongList(hopDongs);
 
       // Fetch phong data
-      const phongResponse = await fetch('/api/phong?limit=100');
+      const phongResponse = await fetch('/api/phong?limit=10000');
       const phongData = phongResponse.ok ? await phongResponse.json() : { data: [] };
       const phongs = phongData.data || [];
       setPhongList(phongs);
 
       // Fetch khach thue data
-      const khachThueResponse = await fetch('/api/khach-thue?limit=100');
+      const khachThueResponse = await fetch('/api/khach-thue?limit=10000');
       const khachThueData = khachThueResponse.ok ? await khachThueResponse.json() : { data: [] };
       const khachThues = khachThueData.data || [];
       setKhachThueList(khachThues);
 
       // Fetch toa nha data
-      const toaNhaResponse = await fetch('/api/toa-nha?limit=100');
+      const toaNhaResponse = await fetch('/api/toa-nha?limit=10000');
       const toaNhaData = toaNhaResponse.ok ? await toaNhaResponse.json() : { data: [] };
       const toaNhas = toaNhaData.data || [];
       setToaNhaList(toaNhas);

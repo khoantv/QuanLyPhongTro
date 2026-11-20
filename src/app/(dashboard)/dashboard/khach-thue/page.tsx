@@ -40,6 +40,8 @@ import {
   RefreshCw,
   Copy,
   Wallet,
+  Lock,
+  LockOpen,
 } from 'lucide-react';
 import { KhachThue } from '@/types';
 import { KhachThueDataTable } from './table';
@@ -103,7 +105,7 @@ export default function KhachThuePage() {
       const params = new URLSearchParams();
       if (selectedTrangThai && selectedTrangThai !== 'all') params.append('trangThai', selectedTrangThai);
       
-      const response = await fetch(`/api/khach-thue?${params.toString()}&limit=100`);
+      const response = await fetch(`/api/khach-thue?${params.toString()}&limit=10000`);
       let khachThueData: KhachThue[] = [];
       if (response.ok) {
         const result = await response.json();
@@ -153,6 +155,34 @@ export default function KhachThuePage() {
   const handleEdit = (khachThue: KhachThue) => {
     setEditingKhachThue(khachThue);
     setIsDialogOpen(true);
+  };
+
+  const handleToggleKhoa = async (khachThue: KhachThue) => {
+    const khoa = !khachThue.khoaTaiKhoan;
+    if (khoa && !confirm(`Khóa tài khoản đăng nhập của ${khachThue.hoTen}? Khách sẽ không đăng nhập được cho tới khi mở khóa.`)) {
+      return;
+    }
+    setActionLoading(`khoa-${khachThue._id}`);
+    try {
+      const response = await fetch(`/api/khach-thue/${khachThue._id}/khoa-tai-khoan`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ khoa }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        cache.clearCache();
+        setKhachThueList(prev => prev.map(k => (k._id === khachThue._id ? { ...k, khoaTaiKhoan: khoa } : k)));
+        toast.success(result.message);
+      } else {
+        toast.error(result.message || 'Có lỗi xảy ra');
+      }
+    } catch (error) {
+      console.error('Error toggling khach thue lock:', error);
+      toast.error('Có lỗi xảy ra');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -327,6 +357,7 @@ export default function KhachThuePage() {
             data={filteredKhachThue}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onToggleKhoa={handleToggleKhoa}
             congNo={congNo}
             onCongNo={(kt) => setCongNoKhach({ khach: kt, cheDo: 'xem' })}
             onThuTien={(kt) => setCongNoKhach({ khach: kt, cheDo: 'thuTien' })}
@@ -396,6 +427,12 @@ export default function KhachThuePage() {
                           return <Badge variant="outline" className="text-xs">{khachThue.trangThai}</Badge>;
                       }
                     })()}
+                    {khachThue.khoaTaiKhoan && (
+                      <Badge variant="outline" className="text-xs gap-1 border-red-200 text-red-700">
+                        <Lock className="h-3 w-3" />
+                        Đã khóa
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -436,15 +473,15 @@ export default function KhachThuePage() {
                 </div>
 
                 {/* Room info if available */}
-                {(khachThue as any).hopDongHienTai?.phong && (
+                {khachThue.hopDongHienTai?.phong && (
                   <div className="border-t pt-2">
                     <div className="flex items-center gap-2 text-sm">
                       <Users className="h-3 w-3 text-green-600" />
-                      <span className="font-medium">Phòng: {(khachThue as any).hopDongHienTai.phong.maPhong}</span>
+                      <span className="font-medium">Phòng: {khachThue.hopDongHienTai.phong.maPhong}</span>
                     </div>
-                    {(khachThue as any).hopDongHienTai.phong.toaNha && (
+                    {khachThue.hopDongHienTai.phong.toaNha && (
                       <div className="flex items-center gap-2 text-xs text-gray-500 ml-5">
-                        <span>{(khachThue as any).hopDongHienTai.phong.toaNha.tenToaNha}</span>
+                        <span>{khachThue.hopDongHienTai.phong.toaNha.tenToaNha}</span>
                       </div>
                     )}
                   </div>
@@ -489,6 +526,15 @@ export default function KhachThuePage() {
                       disabled={actionLoading === `edit-${khachThue._id}`}
                     >
                       <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleKhoa(khachThue)}
+                      disabled={actionLoading === `khoa-${khachThue._id}`}
+                      title={khachThue.khoaTaiKhoan ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                    >
+                      {khachThue.khoaTaiKhoan ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
                   <Button
@@ -570,10 +616,8 @@ function KhachThueForm({
       const method = khachThue ? 'PUT' : 'POST';
 
       // Chỉ gửi matKhau khi nó được nhập
-      const submitData = { ...formData };
-      if (!submitData.matKhau || submitData.matKhau.trim() === '') {
-        delete (submitData as any).matKhau;
-      }
+      const { matKhau, ...duLieuKhongMatKhau } = formData;
+      const submitData = matKhau && matKhau.trim() !== '' ? formData : duLieuKhongMatKhau;
 
       const response = await fetch(url, {
         method,

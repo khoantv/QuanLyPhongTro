@@ -46,7 +46,7 @@ export default function BangThuTienPage() {
 
   useEffect(() => {
     document.title = 'Bảng thu tiền tháng';
-    fetch('/api/toa-nha?limit=200')
+    fetch('/api/toa-nha?limit=10000')
       .then((r) => r.json())
       .then((r) => {
         const list = r.data || [];

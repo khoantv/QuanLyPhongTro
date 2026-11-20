@@ -125,14 +125,14 @@ export default function ChinhSuaHopDongPage() {
       }
 
       // Fetch phong data
-      const phongResponse = await fetch('/api/phong?limit=100');
+      const phongResponse = await fetch('/api/phong?limit=10000');
       if (phongResponse.ok) {
         const phongData = await phongResponse.json();
         setPhongList(phongData.data || []);
       }
 
       // Fetch khach thue data
-      const khachThueResponse = await fetch('/api/khach-thue?limit=100');
+      const khachThueResponse = await fetch('/api/khach-thue?limit=10000');
       if (khachThueResponse.ok) {
         const khachThueData = await khachThueResponse.json();
         setKhachThueList(khachThueData.data || []);

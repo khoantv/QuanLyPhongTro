@@ -54,6 +54,16 @@ import { SuCoImageUpload } from '@/components/ui/su-co-image-upload';
 import { DeleteConfirmPopover } from '@/components/ui/delete-confirm-popover';
 import { SuCoDataTable } from './table';
 
+// Hợp đồng từ API đã populate phòng và người đại diện
+type HopDongTomTat = Omit<HopDong, 'phong' | 'nguoiDaiDien'> & {
+  phong: string | { _id: string };
+  nguoiDaiDien: string | { _id: string };
+};
+
+// Lấy _id từ tham chiếu (chuỗi ObjectId hoặc object đã populate)
+const idCua = (ref: string | { _id: string } | null | undefined): string =>
+  !ref ? '' : typeof ref === 'string' ? ref : ref._id;
+
 export default function SuCoPage() {
   const cache = useCache<{
     suCoList: SuCo[];
@@ -99,25 +109,25 @@ export default function SuCoPage() {
       }
       
       // Fetch sự cố từ API
-      const suCoResponse = await fetch('/api/su-co');
+      const suCoResponse = await fetch('/api/su-co?limit=10000');
       const suCoData = await suCoResponse.json();
       const suCos = suCoData.success ? suCoData.data : [];
       setSuCoList(suCos);
 
       // Fetch phòng từ API
-      const phongResponse = await fetch('/api/phong');
+      const phongResponse = await fetch('/api/phong?limit=10000');
       const phongData = await phongResponse.json();
       const phongs = phongData.success ? phongData.data : [];
       setPhongList(phongs);
 
       // Fetch khách thuê từ API
-      const khachThueResponse = await fetch('/api/khach-thue');
+      const khachThueResponse = await fetch('/api/khach-thue?limit=10000');
       const khachThueData = await khachThueResponse.json();
       const khachThues = khachThueData.success ? khachThueData.data : [];
       setKhachThueList(khachThues);
 
       // Fetch hợp đồng từ API
-      const hopDongResponse = await fetch('/api/hop-dong');
+      const hopDongResponse = await fetch('/api/hop-dong?limit=10000');
       const hopDongData = await hopDongResponse.json();
       const hopDongs = hopDongData.success ? hopDongData.data : [];
       setHopDongList(hopDongs);
@@ -485,7 +495,7 @@ export default function SuCoPage() {
         <div className="space-y-3">
           {filteredSuCo.map((suCo) => {
             const phongInfo = typeof suCo.phong === 'object' ? suCo.phong : phongList.find(p => p._id === suCo.phong);
-            const khachThueInfo = typeof suCo.nguoiBaoCao === 'object' ? suCo.nguoiBaoCao : khachThueList.find(k => k._id === suCo.nguoiBaoCao);
+            const khachThueInfo = typeof suCo.khachThue === 'object' ? suCo.khachThue : khachThueList.find(k => k._id === suCo.khachThue);
             
             return (
               <Card key={suCo._id} className="p-4">
@@ -580,14 +590,14 @@ function SuCoForm({
   suCo: SuCo | null;
   phongList: Phong[];
   khachThueList: KhachThue[];
-  hopDongList: any[];
-  getKhachThueName: (khachThue: any) => string;
+  hopDongList: HopDongTomTat[];
+  getKhachThueName: (khachThue: string | { hoTen: string }) => string;
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const [formData, setFormData] = useState({
-    phong: suCo?.phong || '',
-    khachThue: suCo?.khachThue || '',
+    phong: idCua(suCo?.phong),
+    khachThue: idCua(suCo?.khachThue),
     tieuDe: suCo?.tieuDe || '',
     moTa: suCo?.moTa || '',
     loaiSuCo: suCo?.loaiSuCo || 'dienNuoc',
@@ -598,7 +608,7 @@ function SuCoForm({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedPhong, setSelectedPhong] = useState<any>(null);
+  const [selectedPhong, setSelectedPhong] = useState<Phong | null>(null);
   const [images, setImages] = useState<string[]>(suCo?.anhSuCo || []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -658,17 +668,17 @@ function SuCoForm({
     
     // Tìm thông tin phòng được chọn
     const phong = phongList.find(p => p._id === phongId);
-    setSelectedPhong(phong);
+    setSelectedPhong(phong ?? null);
     
     if (phong) {
       // Tìm hợp đồng đang hoạt động cho phòng này
       const hopDongHoatDong = hopDongList.find(hd => 
-        hd.phong._id === phongId && hd.trangThai === 'hoatDong'
+        idCua(hd.phong) === phongId && hd.trangThai === 'hoatDong'
       );
       
       if (hopDongHoatDong && hopDongHoatDong.nguoiDaiDien) {
         // Lấy người đại diện làm khách thuê chính
-        setFormData(prev => ({ ...prev, khachThue: hopDongHoatDong.nguoiDaiDien._id || hopDongHoatDong.nguoiDaiDien }));
+        setFormData(prev => ({ ...prev, khachThue: idCua(hopDongHoatDong.nguoiDaiDien) }));
       } else {
         // Nếu không tìm thấy hợp đồng hoạt động, reset khách thuê
         setFormData(prev => ({ ...prev, khachThue: '' }));
@@ -747,7 +757,7 @@ function SuCoForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         <div className="space-y-2">
           <Label htmlFor="loaiSuCo" className="text-xs md:text-sm">Loại sự cố</Label>
-          <Select value={formData.loaiSuCo} onValueChange={(value) => setFormData(prev => ({ ...prev, loaiSuCo: value as any }))}>
+          <Select value={formData.loaiSuCo} onValueChange={(value) => setFormData(prev => ({ ...prev, loaiSuCo: value as SuCo['loaiSuCo'] }))}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Chọn loại sự cố" />
             </SelectTrigger>
@@ -763,7 +773,7 @@ function SuCoForm({
         
         <div className="space-y-2">
           <Label htmlFor="mucDoUuTien" className="text-xs md:text-sm">Mức độ ưu tiên</Label>
-          <Select value={formData.mucDoUuTien} onValueChange={(value) => setFormData(prev => ({ ...prev, mucDoUuTien: value as any }))}>
+          <Select value={formData.mucDoUuTien} onValueChange={(value) => setFormData(prev => ({ ...prev, mucDoUuTien: value as SuCo['mucDoUuTien'] }))}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Chọn mức độ ưu tiên" />
             </SelectTrigger>
@@ -780,7 +790,7 @@ function SuCoForm({
       {suCo && (
         <div className="space-y-2">
           <Label htmlFor="trangThai" className="text-xs md:text-sm">Trạng thái</Label>
-          <Select value={formData.trangThai} onValueChange={(value) => setFormData(prev => ({ ...prev, trangThai: value as any }))}>
+          <Select value={formData.trangThai} onValueChange={(value) => setFormData(prev => ({ ...prev, trangThai: value as SuCo['trangThai'] }))}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Chọn trạng thái" />
             </SelectTrigger>

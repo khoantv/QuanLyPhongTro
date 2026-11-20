@@ -4,6 +4,7 @@ import KhachThue from '@/models/KhachThue';
 import HopDong from '@/models/HopDong';
 import HoaDon from '@/models/HoaDon';
 import jwt from 'jsonwebtoken';
+import { lyDoKhongDuocDangNhap } from '@/lib/khach-thue/tai-khoan';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,9 +20,9 @@ export async function GET(request: NextRequest) {
     const token = authHeader.substring(7);
     
     // Verify token
-    let decoded: any;
+    let decoded: jwt.JwtPayload & { id?: string; role?: string };
     try {
-      decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET || 'secret');
+      decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET || 'secret') as jwt.JwtPayload & { id?: string; role?: string };
     } catch (error) {
       return NextResponse.json(
         { success: false, message: 'Token không hợp lệ' },
@@ -46,6 +47,12 @@ export async function GET(request: NextRequest) {
         { success: false, message: 'Khách thuê không tồn tại' },
         { status: 404 }
       );
+    }
+
+    // Phiên đăng nhập cũ (token còn hạn) cũng bị chặn khi tài khoản bị khóa / đã trả phòng
+    const lyDoChan = await lyDoKhongDuocDangNhap(khachThue);
+    if (lyDoChan) {
+      return NextResponse.json({ success: false, message: lyDoChan }, { status: 403 });
     }
 
     // Lấy hợp đồng hiện tại

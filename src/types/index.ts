@@ -64,6 +64,9 @@ export interface ToaNha {
   chuSoHuu: string; // ObjectId ref NguoiDung
   tongSoPhong: number;
   tienNghiChung: string[];
+  /** Thống kê do API danh sách tính thêm */
+  phongTrong?: number;
+  phongDangThue?: number;
   ngayTao: Date;
   ngayCapNhat: Date;
 }
@@ -113,6 +116,7 @@ export interface KhachThue {
   trangThai: 'dangThue' | 'daTraPhong' | 'chuaThue';
   zaloUserId?: string;
   daQuanTamOA?: boolean;
+  khoaTaiKhoan?: boolean;
   ngayTao: Date;
   ngayCapNhat: Date;
   hopDongHienTai?: {
@@ -351,8 +355,10 @@ export interface PhieuThuChi {
 
 export interface SuCo {
   _id?: string;
-  phong: string; // ObjectId ref Phong
-  khachThue: string; // ObjectId ref KhachThue
+  /** ObjectId ref Phong — API trả về bản đã populate (maPhong) */
+  phong: string | { _id: string; maPhong: string };
+  /** ObjectId ref KhachThue — API trả về bản đã populate (hoTen, soDienThoai) */
+  khachThue: string | { _id: string; hoTen: string; soDienThoai?: string };
   tieuDe: string;
   moTa: string;
   anhSuCo: string[];

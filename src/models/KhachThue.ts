@@ -18,6 +18,8 @@ export interface IKhachThue extends Document {
   trangThai: 'dangThue' | 'daTraPhong' | 'chuaThue';
   zaloUserId?: string;
   daQuanTamOA: boolean;
+  /** Quản lý khóa thủ công — khách không đăng nhập được */
+  khoaTaiKhoan: boolean;
   ngayTao: Date;
   ngayCapNhat: Date;
 }
@@ -104,6 +106,10 @@ const KhachThueSchema = new Schema<IKhachThue>({
     type: Boolean,
     default: false,
   },
+  khoaTaiKhoan: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: { createdAt: 'ngayTao', updatedAt: 'ngayCapNhat' }
 });
@@ -119,8 +125,8 @@ KhachThueSchema.pre('save', async function(next) {
     const salt = await bcrypt.genSalt(10);
     this.matKhau = await bcrypt.hash(this.matKhau, salt);
     next();
-  } catch (error: any) {
-    next(error);
+  } catch (error) {
+    next(error as Error);
   }
 });
 

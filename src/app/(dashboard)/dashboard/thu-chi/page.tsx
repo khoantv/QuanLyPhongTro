@@ -94,7 +94,7 @@ export default function ThuChiPage() {
   const fetchStatic = useCallback(async () => {
     const [rDm, rTn] = await Promise.all([
       fetch('/api/danh-muc-thu-chi'),
-      fetch('/api/toa-nha?limit=100'),
+      fetch('/api/toa-nha?limit=10000'),
     ]);
     if (rDm.ok) { const j = await rDm.json(); if (j.success) setDanhMucList(j.data); }
     if (rTn.ok) { const j = await rTn.json(); if (j.success) setToaNhaList(j.data); }

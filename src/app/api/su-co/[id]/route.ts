@@ -18,9 +18,10 @@ const updateSuCoSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     
     if (!session) {
@@ -32,7 +33,7 @@ export async function GET(
 
     await dbConnect();
 
-    const suCo = await SuCo.findById(params.id)
+    const suCo = await SuCo.findById(id)
       .populate('phong', 'maPhong toaNha')
       .populate('khachThue', 'hoTen soDienThoai')
       .populate('nguoiXuLy', 'ten email');
@@ -60,9 +61,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     
     if (!session) {
@@ -78,7 +80,7 @@ export async function PUT(
     await dbConnect();
 
     const suCo = await SuCo.findByIdAndUpdate(
-      params.id,
+      id,
       validatedData,
       { new: true, runValidators: true }
     ).populate('phong', 'maPhong toaNha')
@@ -101,7 +103,7 @@ export async function PUT(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { message: error.errors[0].message },
+        { message: error.issues[0].message },
         { status: 400 }
       );
     }
@@ -116,9 +118,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     
     if (!session) {
@@ -130,7 +133,7 @@ export async function DELETE(
 
     await dbConnect();
 
-    const suCo = await SuCo.findById(params.id);
+    const suCo = await SuCo.findById(id);
     if (!suCo) {
       return NextResponse.json(
         { message: 'Sự cố không tồn tại' },
@@ -138,7 +141,7 @@ export async function DELETE(
       );
     }
 
-    await SuCo.findByIdAndDelete(params.id);
+    await SuCo.findByIdAndDelete(id);
 
     return NextResponse.json({
       success: true,

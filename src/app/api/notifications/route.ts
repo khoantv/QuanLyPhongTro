@@ -141,14 +141,14 @@ async function getPendingIssues() {
     .sort({ mucDoUuTien: -1, ngayBaoCao: -1 });
 
   return pendingIssues.map(issue => {
-    const priorityMap = {
+    const priorityMap: Record<string, string> = {
       'khancap': 'critical',
       'cao': 'high',
       'trungBinh': 'medium',
       'thap': 'low',
     };
 
-    const statusMap = {
+    const statusMap: Record<string, string> = {
       'moi': 'Mới',
       'dangXuLy': 'Đang xử lý',
     };
@@ -214,7 +214,7 @@ async function getAllNotifications() {
   ];
 
   // Sort by priority (critical > high > medium > low) and then by date
-  const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+  const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
   
   return allNotifications.sort((a, b) => {
     const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);

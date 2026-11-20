@@ -46,6 +46,8 @@ import {
   X,
   Wallet,
   HandCoins,
+  Lock,
+  LockOpen,
 } from "lucide-react"
 import {
   ColumnDef,
@@ -149,6 +151,7 @@ type KhachThueTableProps = {
   onView?: (khachThue: KhachThue) => void
   onEdit: (khachThue: KhachThue) => void
   onDelete: (id: string) => void
+  onToggleKhoa?: (khachThue: KhachThue) => void
   actionLoading: string | null
 }
 
@@ -258,7 +261,7 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
     accessorKey: "phongDangThue",
     header: "Phòng đang thuê",
     cell: ({ row }) => {
-      const khachThue = row.original as any;
+      const khachThue = row.original;
       const hopDong = khachThue.hopDongHienTai;
       
       if (!hopDong || !hopDong.phong) {
@@ -297,7 +300,7 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
     accessorKey: "matKhau",
     header: "Tài khoản",
     cell: ({ row }) => {
-      const khachThue = row.original as any;
+      const khachThue = row.original;
       const hasPassword = !!khachThue.matKhau;
       
       return (
@@ -321,7 +324,17 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
   {
     accessorKey: "trangThai",
     header: "Trạng thái",
-    cell: ({ row }) => getStatusBadge(row.original.trangThai),
+    cell: ({ row }) => (
+      <div className="flex flex-wrap items-center gap-1">
+        {getStatusBadge(row.original.trangThai)}
+        {row.original.khoaTaiKhoan && (
+          <Badge variant="outline" className="gap-1 border-red-200 text-red-700" title="Tài khoản đăng nhập đã bị khóa">
+            <Lock className="h-3 w-3" />
+            Đã khóa
+          </Badge>
+        )}
+      </div>
+    ),
   },
   {
     id: "congNo",
@@ -375,6 +388,16 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
             <Edit className="mr-2 h-4 w-4" />
             Chỉnh sửa
           </DropdownMenuItem>
+          {props.onToggleKhoa && (
+            <DropdownMenuItem
+              onClick={() => props.onToggleKhoa!(row.original)}
+              disabled={props.actionLoading === `khoa-${row.original._id}`}
+            >
+              {row.original.khoaTaiKhoan
+                ? <><LockOpen className="mr-2 h-4 w-4" />Mở khóa tài khoản</>
+                : <><Lock className="mr-2 h-4 w-4" />Khóa tài khoản</>}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             className="text-destructive"

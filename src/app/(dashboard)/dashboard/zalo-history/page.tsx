@@ -58,7 +58,7 @@ export default function ZaloHistoryPage() {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ year: String(year), month: String(month), limit: '100' });
+      const params = new URLSearchParams({ year: String(year), month: String(month), limit: '10000' });
       if (phongFilter && phongFilter !== 'all') params.set('phongId', phongFilter);
       if (statusFilter) params.set('status', statusFilter);
       const res = await fetch(`/api/zalo/logs?${params}`);
@@ -80,7 +80,7 @@ export default function ZaloHistoryPage() {
     document.title = 'Lịch sử gửi hóa đơn qua Zalo';
     (async () => {
       const [p, s] = await Promise.all([
-        fetch('/api/phong?limit=200'),
+        fetch('/api/phong?limit=10000'),
         fetch('/api/cai-dat-hoa-don'),
       ]);
       if (p.ok) {

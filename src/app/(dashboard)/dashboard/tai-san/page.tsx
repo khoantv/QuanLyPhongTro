@@ -71,9 +71,9 @@ export default function TaiSanPage() {
     setLoading(true);
     try {
       const [r1, r2, r3] = await Promise.all([
-        fetch('/api/tai-san?limit=200'),
-        fetch('/api/phong?limit=200'),
-        fetch('/api/toa-nha?limit=50'),
+        fetch('/api/tai-san?limit=10000'),
+        fetch('/api/phong?limit=10000'),
+        fetch('/api/toa-nha?limit=10000'),
       ]);
       if (r1.ok) { const j = await r1.json(); if (j.success) setData(j.data); }
       if (r2.ok) { const j = await r2.json(); if (j.success) setPhongList(j.data); }

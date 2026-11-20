@@ -78,7 +78,7 @@ export default function ToaNhaPage() {
         }
       }
       
-      const response = await fetch('/api/toa-nha');
+      const response = await fetch('/api/toa-nha?limit=10000');
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -222,7 +222,7 @@ export default function ToaNhaPage() {
             <div>
               <p className="text-[10px] md:text-xs font-medium text-gray-600">Phòng trống</p>
               <p className="text-base md:text-2xl font-bold text-green-600">
-                {toaNhaList.reduce((sum, toaNha) => sum + ((toaNha as any).phongTrong || 0), 0)}
+                {toaNhaList.reduce((sum, toaNha) => sum + (toaNha.phongTrong || 0), 0)}
               </p>
             </div>
             <Users className="h-3 w-3 md:h-4 md:w-4 text-green-600" />
@@ -234,7 +234,7 @@ export default function ToaNhaPage() {
             <div>
               <p className="text-[10px] md:text-xs font-medium text-gray-600">Đang thuê</p>
               <p className="text-base md:text-2xl font-bold text-blue-600">
-                {toaNhaList.reduce((sum, toaNha) => sum + ((toaNha as any).phongDangThue || 0), 0)}
+                {toaNhaList.reduce((sum, toaNha) => sum + (toaNha.phongDangThue || 0), 0)}
               </p>
             </div>
             <Users className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
@@ -300,8 +300,8 @@ export default function ToaNhaPage() {
         ) : (
           <div className="grid grid-cols-1 gap-3">
             {filteredToaNha.map((toaNha) => {
-              const phongTrong = (toaNha as any).phongTrong || 0;
-              const phongDangThue = (toaNha as any).phongDangThue || 0;
+              const phongTrong = toaNha.phongTrong || 0;
+              const phongDangThue = toaNha.phongDangThue || 0;
               const tongPhong = toaNha.tongSoPhong;
               
               return (

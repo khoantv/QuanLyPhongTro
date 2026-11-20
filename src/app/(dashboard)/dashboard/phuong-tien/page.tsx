@@ -81,8 +81,8 @@ export default function PhuongTienPage() {
     setLoading(true);
     try {
       const [ptRes, ktRes] = await Promise.all([
-        fetch('/api/phuong-tien?limit=200'),
-        fetch('/api/khach-thue?limit=500'),
+        fetch('/api/phuong-tien?limit=10000'),
+        fetch('/api/khach-thue?limit=10000'),
       ]);
       if (ptRes.ok) {
         const r = await ptRes.json();

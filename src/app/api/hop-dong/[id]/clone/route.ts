@@ -60,7 +60,7 @@ export async function POST(
       giaNuoc: source.giaNuoc,
       chiSoDienBanDau: source.chiSoDienBanDau,
       chiSoNuocBanDau: source.chiSoNuocBanDau,
-      phiDichVu: (source.phiDichVu || []).map(p => ({ ten: p.ten, gia: p.gia })),
+      phiDichVu: (source.phiDichVu || []).map((p: { ten: string; gia: number }) => ({ ten: p.ten, gia: p.gia })),
       trangThai: 'daHuy',
     });
 

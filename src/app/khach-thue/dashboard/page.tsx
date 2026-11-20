@@ -5,9 +5,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Home, FileText, AlertCircle, MapPin, Calendar, DollarSign, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+
+// Dữ liệu trả về từ /api/auth/khach-thue/me
+type DashboardData = {
+  khachThue: { _id: string; hoTen: string; soDienThoai: string; email?: string; trangThai: string };
+  hopDongHienTai: {
+    maHopDong: string;
+    ngayBatDau: string;
+    ngayKetThuc: string;
+    tienCoc: number;
+    phong: {
+      maPhong: string;
+      giaThue: number;
+      toaNha: { tenToaNha: string; diaChi?: { duong?: string; phuong?: string } };
+    };
+  } | null;
+  soHoaDonChuaThanhToan: number;
+  hoaDonGanNhat: { maHoaDon: string; thang: number; nam: number; tongTien: number; trangThai: string } | null;
+};
 
 export default function KhachThueDashboardPage() {
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const router = useRouter();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +46,14 @@ export default function KhachThueDashboardPage() {
       });
 
       const result = await response.json();
+      if (response.status === 401 || response.status === 403) {
+        // Hết phiên, tài khoản bị khóa hoặc đã trả phòng → đăng xuất
+        localStorage.removeItem('khachThueToken');
+        localStorage.removeItem('khachThueData');
+        toast.error(result.message || 'Phiên đăng nhập không còn hiệu lực');
+        router.push('/khach-thue/dang-nhap');
+        return;
+      }
       if (result.success) {
         setDashboardData(result.data);
       } else {

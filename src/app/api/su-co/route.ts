@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const mucDoUuTien = searchParams.get('mucDoUuTien') || '';
     const trangThai = searchParams.get('trangThai') || '';
 
-    const query: any = {};
+    const query: Record<string, unknown> = {};
     
     if (search) {
       query.$or = [
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { message: error.errors[0].message },
+        { message: error.issues[0].message },
         { status: 400 }
       );
     }

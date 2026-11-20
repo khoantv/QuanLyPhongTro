@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongodb';
 import KhachThue from '@/models/KhachThue';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
+import { lyDoKhongDuocDangNhap } from '@/lib/khach-thue/tai-khoan';
 
 const loginSchema = z.object({
   soDienThoai: z.string().regex(/^[0-9]{10,11}$/, 'Số điện thoại không hợp lệ'),
@@ -44,6 +45,12 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'Số điện thoại hoặc mật khẩu không đúng' },
         { status: 401 }
       );
+    }
+
+    // Chặn tài khoản bị khóa hoặc khách đã trả phòng
+    const lyDoChan = await lyDoKhongDuocDangNhap(khachThue);
+    if (lyDoChan) {
+      return NextResponse.json({ success: false, message: lyDoChan }, { status: 403 });
     }
 
     // Tạo JWT token

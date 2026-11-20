@@ -98,7 +98,7 @@ export function ThuTienForm({
 
   // Danh sách khách + cài đặt mặc định
   useEffect(() => {
-    fetch('/api/khach-thue?limit=1000')
+    fetch('/api/khach-thue?limit=10000')
       .then((r) => r.json())
       .then((r) => {
         if (r.success) {

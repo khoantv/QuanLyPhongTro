@@ -114,7 +114,7 @@ export function ThanhLyDialog({
     setXemTruoc(null); setLoi(null); setKetQua(null);
     fetch('/api/cai-dat-hoa-don').then(r => r.json()).then(r => { if (r.success) setLamTron(Boolean(r.data.lamTronHoaDon)); }).catch(() => undefined);
     if (laChuyen) {
-      fetch('/api/phong?trangThai=trong&limit=500').then(r => r.json()).then(r => setPhongTrong(r.data || [])).catch(() => setPhongTrong([]));
+      fetch('/api/phong?trangThai=trong&limit=10000').then(r => r.json()).then(r => setPhongTrong(r.data || [])).catch(() => setPhongTrong([]));
     }
   }, [open, hopDong, laChuyen]);
 

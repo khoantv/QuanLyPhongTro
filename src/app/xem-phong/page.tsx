@@ -56,7 +56,7 @@ export default function XemPhongPage() {
   const fetchPhong = async () => {
     try {
       const params = new URLSearchParams();
-      params.append('limit', '100');
+      params.append('limit', '10000');
       if (selectedToaNha && selectedToaNha !== 'all') params.append('toaNha', selectedToaNha);
       if (selectedTrangThai && selectedTrangThai !== 'all') params.append('trangThai', selectedTrangThai);
       
@@ -110,7 +110,7 @@ export default function XemPhongPage() {
   const filteredPhong = phongList.filter(phong =>
     phong.maPhong.toLowerCase().includes(searchTerm.toLowerCase()) ||
     phong.moTa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (typeof phong.toaNha === 'object' && phong.toaNha && (phong.toaNha as any).tenToaNha?.toLowerCase().includes(searchTerm.toLowerCase()))
+    (typeof phong.toaNha === 'object' && phong.toaNha && (phong.toaNha as { tenToaNha?: string }).tenToaNha?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getTrangThaiBadge = (trangThai: string) => {
@@ -204,7 +204,7 @@ export default function XemPhongPage() {
                   Phòng {selectedPhong.maPhong}
                 </h1>
                 <p className="text-xs md:text-sm text-slate-600">
-                  {typeof selectedPhong.toaNha === 'object' ? (selectedPhong.toaNha as any).tenToaNha : 'N/A'} - Tầng {selectedPhong.tang}
+                  {typeof selectedPhong.toaNha === 'object' ? (selectedPhong.toaNha as { tenToaNha?: string }).tenToaNha : 'N/A'} - Tầng {selectedPhong.tang}
                 </p>
               </div>
               <div className="text-left md:text-right">
@@ -325,7 +325,7 @@ export default function XemPhongPage() {
                   <div className="flex items-center justify-between text-xs md:text-sm">
                     <span className="text-gray-600">Tòa nhà:</span>
                     <span className="font-medium truncate ml-2">
-                      {typeof selectedPhong.toaNha === 'object' ? (selectedPhong.toaNha as any).tenToaNha : 'N/A'}
+                      {typeof selectedPhong.toaNha === 'object' ? (selectedPhong.toaNha as { tenToaNha?: string }).tenToaNha : 'N/A'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs md:text-sm">
@@ -687,7 +687,7 @@ export default function XemPhongPage() {
                 <CardDescription className="flex flex-wrap gap-2 md:gap-4 text-xs md:text-sm">
                   <span className="flex items-center">
                     <MapPin className="h-3 w-3 md:h-4 md:w-4 mr-1 flex-shrink-0" />
-                    <span className="truncate">{typeof phong.toaNha === 'object' ? (phong.toaNha as any).tenToaNha : 'N/A'}</span>
+                    <span className="truncate">{typeof phong.toaNha === 'object' ? (phong.toaNha as { tenToaNha?: string }).tenToaNha : 'N/A'}</span>
                   </span>
                   <span className="flex items-center">
                     <Square className="h-3 w-3 md:h-4 md:w-4 mr-1 flex-shrink-0" />
