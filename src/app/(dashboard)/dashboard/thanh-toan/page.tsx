@@ -61,11 +61,42 @@ type ThanhToanPopulated = Omit<ThanhToan, 'hoaDon' | 'khachThue'> & {
   khachThue?: string | { _id: string; hoTen: string; soDienThoai?: string } | null;
 };
 
+// HoaDon.phong / HoaDon.khachThue được khai báo là string (ObjectId) nhưng API trả về bản đã populate
+type PhongPopulated = { _id?: string; maPhong?: string };
+type KhachThuePopulated = { _id?: string; hoTen?: string; soDienThoai?: string };
+
+/** Chuỗi 'YYYY-MM-DD' (từ input type=date) → Date theo giờ địa phương; rỗng → null */
+const parseNgay = (s: string, cuoiNgay = false): Date | null => {
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  return cuoiNgay ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d);
+};
+
+/** Bộ lọc thời gian: all | today | week (7 ngày gần nhất) | month | range (tuNgay → denNgay) */
+const khopBoLocThoiGian = (date: Date, boLoc: string, tuNgay: string, denNgay: string) => {
+  const now = new Date();
+  switch (boLoc) {
+    case 'today':
+      return date.toDateString() === now.toDateString();
+    case 'week':
+      return date >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) && date <= now;
+    case 'month':
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    case 'range': {
+      const tu = parseNgay(tuNgay);
+      const den = parseNgay(denNgay, true);
+      return (!tu || date >= tu) && (!den || date <= den);
+    }
+    default:
+      return true;
+  }
+};
+
 export default function ThanhToanPage() {
-  const cache = useCache<{ 
+  const cache = useCache<{
     thanhToanList: ThanhToanPopulated[];
     hoaDonList: HoaDon[];
-  }>({ key: 'thanh-toan-data', duration: 300000 });
+  }>({ key: 'thanh-toan-data-v2', duration: 300000 }); // v2: bỏ cache cũ chỉ có 10 bản ghi
   
   const [thanhToanList, setThanhToanList] = useState<ThanhToanPopulated[]>([]);
   const [hoaDonList, setHoaDonList] = useState<HoaDon[]>([]);
@@ -73,6 +104,8 @@ export default function ThanhToanPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
+  const [tuNgay, setTuNgay] = useState('');
+  const [denNgay, setDenNgay] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingThanhToan, setEditingThanhToan] = useState<ThanhToanPopulated | null>(null);
 
@@ -99,13 +132,14 @@ export default function ThanhToanPage() {
       }
       
       // Fetch thanh toan từ API
-      const thanhToanResponse = await fetch('/api/thanh-toan');
+      // Trang lọc ở client nên cần lấy toàn bộ (API mặc định chỉ trả 10)
+      const thanhToanResponse = await fetch('/api/thanh-toan?limit=10000');
       const thanhToanData = thanhToanResponse.ok ? await thanhToanResponse.json() : { data: [] };
       const thanhToans = thanhToanData.data || [];
       setThanhToanList(thanhToans);
 
       // Fetch hoa don từ API để hiển thị thông tin
-      const hoaDonResponse = await fetch('/api/hoa-don');
+      const hoaDonResponse = await fetch('/api/hoa-don?limit=10000');
       const hoaDonData = hoaDonResponse.ok ? await hoaDonResponse.json() : { data: [] };
       const hoaDons = hoaDonData.data || [];
       setHoaDonList(hoaDons);
@@ -148,11 +182,8 @@ export default function ThanhToanPage() {
                          thanhToan.ghiChu?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          thanhToan.thongTinChuyenKhoan?.soGiaoDich?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesMethod = methodFilter === 'all' || thanhToan.phuongThuc === methodFilter;
-    const matchesDate = dateFilter === 'all' || 
-                       (dateFilter === 'today' && isToday(thanhToan.ngayThanhToan)) ||
-                       (dateFilter === 'week' && isThisWeek(thanhToan.ngayThanhToan)) ||
-                       (dateFilter === 'month' && isThisMonth(thanhToan.ngayThanhToan));
-    
+    const matchesDate = khopBoLocThoiGian(new Date(thanhToan.ngayThanhToan), dateFilter, tuNgay, denNgay);
+
     return matchesSearch && matchesMethod && matchesDate;
   });
 
@@ -169,23 +200,18 @@ export default function ThanhToanPage() {
     }
   };
 
-  const getHoaDonInfo = (hoaDon: string | any) => {
-    console.log('getHoaDonInfo called with:', hoaDon, 'type:', typeof hoaDon);
-    
+  const getHoaDonInfo = (hoaDon: string | HoaDon) => {
     // Nếu hoaDon là object (đã được populate), lấy maHoaDon trực tiếp
     if (typeof hoaDon === 'object' && hoaDon?.maHoaDon) {
-      console.log('Returning populated maHoaDon:', hoaDon.maHoaDon);
       return hoaDon.maHoaDon;
     }
-    
+
     // Nếu hoaDon là string (ID), tìm trong hoaDonList
     if (typeof hoaDon === 'string') {
       const hoaDonItem = hoaDonList.find(h => h._id === hoaDon);
-      console.log('Found hoaDon in list:', hoaDonItem?.maHoaDon);
       return hoaDonItem?.maHoaDon || 'Không xác định';
     }
-    
-    console.log('Returning default: Không xác định');
+
     return 'Không xác định';
   };
 
@@ -194,22 +220,6 @@ export default function ThanhToanPage() {
       style: 'currency',
       currency: 'VND',
     }).format(amount);
-  };
-
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const isThisWeek = (date: Date) => {
-    const today = new Date();
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return date >= weekAgo && date <= today;
-  };
-
-  const isThisMonth = (date: Date) => {
-    const today = new Date();
-    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
   };
 
   const handleEdit = (thanhToan: ThanhToanPopulated) => {
@@ -376,6 +386,10 @@ export default function ThanhToanPage() {
             onMethodChange={setMethodFilter}
             dateFilter={dateFilter}
             onDateChange={setDateFilter}
+            tuNgay={tuNgay}
+            denNgay={denNgay}
+            onTuNgayChange={setTuNgay}
+            onDenNgayChange={setDenNgay}
           />
         </CardContent>
       </Card>
@@ -419,19 +433,26 @@ export default function ThanhToanPage() {
                 <SelectItem value="today" className="text-sm">Hôm nay</SelectItem>
                 <SelectItem value="week" className="text-sm">Tuần này</SelectItem>
                 <SelectItem value="month" className="text-sm">Tháng này</SelectItem>
+                <SelectItem value="range" className="text-sm">Khoảng thời gian</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {dateFilter === 'range' && (
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="date" aria-label="Từ ngày" value={tuNgay} max={denNgay || undefined} onChange={(e) => setTuNgay(e.target.value)} className="text-sm" />
+              <Input type="date" aria-label="Đến ngày" value={denNgay} min={tuNgay || undefined} onChange={(e) => setDenNgay(e.target.value)} className="text-sm" />
+            </div>
+          )}
         </div>
 
         {/* Mobile Card List */}
         <div className="space-y-3">
           {filteredThanhToan.map((thanhToan) => {
             const hoaDonInfo = thanhToan.hoaDon && typeof thanhToan.hoaDon === 'object' ? (thanhToan.hoaDon as HoaDon) : null;
-            const phongInfo = hoaDonInfo && typeof hoaDonInfo.phong === 'object' ? (hoaDonInfo.phong as any) : null;
+            const phongInfo = hoaDonInfo && typeof hoaDonInfo.phong === 'object' ? (hoaDonInfo.phong as unknown as PhongPopulated) : null;
             const khachThueInfo = (thanhToan.khachThue && typeof thanhToan.khachThue === 'object')
               ? thanhToan.khachThue
-              : (hoaDonInfo && typeof hoaDonInfo.khachThue === 'object' ? (hoaDonInfo.khachThue as any) : null);
+              : (hoaDonInfo && typeof hoaDonInfo.khachThue === 'object' ? (hoaDonInfo.khachThue as unknown as KhachThuePopulated) : null);
             
             return (
               <Card key={thanhToan._id} className="p-4">

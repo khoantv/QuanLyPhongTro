@@ -94,6 +94,10 @@ type ThanhToanPopulated = Omit<ThanhToan, 'hoaDon' | 'khachThue'> & {
   khachThue?: string | { _id: string; hoTen: string } | null
 }
 
+// HoaDon.phong / HoaDon.khachThue được khai báo là string (ObjectId) nhưng API trả về bản đã populate
+type PhongPopulated = { _id?: string; maPhong?: string }
+type KhachThuePopulated = { _id?: string; hoTen?: string; soDienThoai?: string }
+
 // Helper functions
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', {
@@ -231,7 +235,7 @@ const createColumns = (props: ThanhToanTableProps): ColumnDef<ThanhToanPopulated
     header: "Phòng",
     cell: ({ row }) => {
       const hoaDonInfo = row.original.hoaDon && typeof row.original.hoaDon === 'object' ? row.original.hoaDon : null;
-      const phongInfo = hoaDonInfo && typeof hoaDonInfo.phong === 'object' ? (hoaDonInfo.phong as any) : null;
+      const phongInfo = hoaDonInfo && typeof hoaDonInfo.phong === 'object' ? (hoaDonInfo.phong as unknown as PhongPopulated) : null;
       return (
         <div className="flex items-center gap-2 min-w-24">
           <Home className="h-4 w-4 text-muted-foreground" />
@@ -249,7 +253,7 @@ const createColumns = (props: ThanhToanTableProps): ColumnDef<ThanhToanPopulated
       const hoaDonInfo = row.original.hoaDon && typeof row.original.hoaDon === 'object' ? row.original.hoaDon : null;
       const khachThueInfo = (row.original.khachThue && typeof row.original.khachThue === 'object')
         ? row.original.khachThue
-        : (hoaDonInfo && typeof hoaDonInfo.khachThue === 'object' ? (hoaDonInfo.khachThue as any) : null);
+        : (hoaDonInfo && typeof hoaDonInfo.khachThue === 'object' ? (hoaDonInfo.khachThue as unknown as KhachThuePopulated) : null);
       return (
         <div className="flex items-center gap-2 min-w-32">
           <Users className="h-4 w-4 text-muted-foreground" />
@@ -388,10 +392,14 @@ type ThanhToanDataTableProps = ThanhToanTableProps & {
   onMethodChange?: (value: string) => void
   dateFilter?: string
   onDateChange?: (value: string) => void
+  tuNgay?: string
+  denNgay?: string
+  onTuNgayChange?: (value: string) => void
+  onDenNgayChange?: (value: string) => void
 }
 
 export function ThanhToanDataTable(props: ThanhToanDataTableProps) {
-  const { data: initialData, searchTerm, onSearchChange, methodFilter, onMethodChange, dateFilter, onDateChange, ...tableProps } = props
+  const { data: initialData, searchTerm, onSearchChange, methodFilter, onMethodChange, dateFilter, onDateChange, tuNgay, denNgay, onTuNgayChange, onDenNgayChange, ...tableProps } = props
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -490,7 +498,7 @@ export function ThanhToanDataTable(props: ThanhToanDataTableProps) {
             </SelectContent>
           </Select>
           <Select value={dateFilter} onValueChange={onDateChange}>
-            <SelectTrigger className="w-full sm:w-[130px]">
+            <SelectTrigger className="w-full sm:w-[170px]">
               <SelectValue placeholder="Thời gian" />
             </SelectTrigger>
             <SelectContent>
@@ -498,8 +506,18 @@ export function ThanhToanDataTable(props: ThanhToanDataTableProps) {
               <SelectItem value="today">Hôm nay</SelectItem>
               <SelectItem value="week">Tuần này</SelectItem>
               <SelectItem value="month">Tháng này</SelectItem>
+              <SelectItem value="range">Khoảng thời gian</SelectItem>
             </SelectContent>
           </Select>
+          {dateFilter === 'range' && (
+            <div className="flex items-center gap-2">
+              <Input type="date" aria-label="Từ ngày" value={tuNgay ?? ''} max={denNgay || undefined}
+                onChange={(e) => onTuNgayChange?.(e.target.value)} className="w-full sm:w-[150px]" />
+              <span className="text-sm text-muted-foreground">→</span>
+              <Input type="date" aria-label="Đến ngày" value={denNgay ?? ''} min={tuNgay || undefined}
+                onChange={(e) => onDenNgayChange?.(e.target.value)} className="w-full sm:w-[150px]" />
+            </div>
+          )}
         </div>
 
         {/* Tùy chỉnh cột bên phải */}
