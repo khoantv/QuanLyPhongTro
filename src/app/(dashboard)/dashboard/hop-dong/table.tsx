@@ -41,6 +41,8 @@ import {
   Plus,
   Search,
   Copy,
+  ArrowRightLeft,
+  LogOut,
 } from "lucide-react"
 import {
   ColumnDef,
@@ -119,6 +121,12 @@ const getStatusBadge = (status: string) => {
           Đã hủy
         </Badge>
       )
+    case 'daThanhLy':
+      return (
+        <Badge variant="outline" className="gap-1 border-slate-400 text-slate-700">
+          Đã thanh lý
+        </Badge>
+      )
     default:
       return <Badge variant="outline">{status}</Badge>
   }
@@ -163,6 +171,8 @@ type HopDongTableProps = {
   onGiaHan: (hopDong: HopDong) => void
   onHuy: (hopDong: HopDong) => void
   onClone?: (hopDong: HopDong) => void
+  onChuyenPhong?: (hopDong: HopDong) => void
+  onTraPhong?: (hopDong: HopDong) => void
   actionLoading: string | null
 }
 
@@ -349,6 +359,18 @@ const createColumns = (props: HopDongTableProps): ColumnDef<HopDong>[] => [
                 <Calendar className="mr-2 h-4 w-4" />
                 Gia hạn
               </DropdownMenuItem>
+              {props.onChuyenPhong && (
+                <DropdownMenuItem onClick={() => props.onChuyenPhong!(row.original)}>
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                  Chuyển phòng
+                </DropdownMenuItem>
+              )}
+              {props.onTraPhong && (
+                <DropdownMenuItem onClick={() => props.onTraPhong!(row.original)}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Trả phòng
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => props.onHuy(row.original)}>
                 <FileText className="mr-2 h-4 w-4" />
                 Hủy hợp đồng
@@ -501,6 +523,7 @@ export function HopDongDataTable(props: HopDongDataTableProps) {
               <SelectItem value="hoatDong">Hoạt động</SelectItem>
               <SelectItem value="hetHan">Hết hạn</SelectItem>
               <SelectItem value="daHuy">Đã hủy</SelectItem>
+              <SelectItem value="daThanhLy">Đã thanh lý</SelectItem>
             </SelectContent>
           </Select>
           <Select value={toaNhaFilter} onValueChange={onToaNhaChange}>

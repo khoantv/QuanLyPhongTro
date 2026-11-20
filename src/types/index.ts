@@ -238,6 +238,8 @@ export interface HopDong {
   hopDongSau?: string | null;
   lyDoKetThuc?: 'hetHan' | 'traPhong' | 'chuyenPhong' | 'huy' | null;
   ngayTraPhong?: string | Date | null;
+  tienCocDaTru?: number;
+  tienCocDaHoan?: number;
   fileHopDong?: string;
   ngayTao: Date;
   ngayCapNhat: Date;

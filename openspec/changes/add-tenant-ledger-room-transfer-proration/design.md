@@ -128,7 +128,7 @@ Tổng các kỳ, làm tròn đến đồng (`Math.round`). Ngày vào được 
 
 **Chọn**: `POST /api/hop-dong/[id]/chuyen-phong` thực hiện tuần tự qua `src/lib/thanh-ly.ts`:
 
-1. Ghi `ChiSoDienNuoc` chốt cho phòng cũ tại `ngayChuyen`.
+1. Lưu chỉ số chốt trên hóa đơn chốt (không ghi `ChiSoDienNuoc` vì bản ghi đó là duy nhất mỗi tháng và dành cho kỳ thu).
 2. Lập `HoaDon` `loaiHoaDon='chotPhong'`: điện nước từ chỉ số trước đến chỉ số chốt + tiền phòng điều chỉnh theo Decision 4 (luôn hoàn nếu đã thu trước — vì khách vẫn ở với chủ trọ).
 3. Hợp đồng cũ: `trangThai='daThanhLy'`, `lyDoKetThuc='chuyenPhong'`, `ngayTraPhong=ngayChuyen`, `hopDongSau`.
 4. Tạo hợp đồng mới: cùng khách thuê, `phong` mới, `ngayBatDau=ngayChuyen`, chỉ số ban đầu = chỉ số hiện tại của phòng mới, `giaThue` theo phòng mới (sửa được), `ngayThanhToan` mặc định giữ của hợp đồng cũ, `daThuTienPhongDen=ngayChuyen`, `hopDongTruoc`.
@@ -149,7 +149,7 @@ Endpoint `GET /api/hop-dong/[id]/tinh-tien-chot?ngay&chiSoDien&chiSoNuoc` trả 
 **Chọn**: `POST /api/hop-dong/[id]/tra-phong` dùng cùng bước 1–3, 6, 7 của Decision 6, khác ở:
 
 - Hoàn tiền phòng đã thu trước chỉ khi `CaiDatHoaDon.hoanTienPhongKhiTraPhong = true` (mặc định `false` — đa số chủ trọ không hoàn khi khách tự trả phòng); admin có thể ghi đè từng lần.
-- Sau khi lập hóa đơn chốt, nếu `dungCocTruNo = true` (mặc định): ghi bút toán `truCoc = −min(tienCoc, soDuDuong)`. Phần cọc còn lại và tiền thừa (nếu có) được hoàn khi admin xác nhận → bút toán `hoanTien` (+) và tạo phiếu chi trong module thu/chi.
+- Sau khi lập hóa đơn chốt, nếu `dungCocTruNo = true` (mặc định): ghi bút toán `truCoc = −min(tienCoc, soDuDuong)`. Tiền thừa được hoàn bằng bút toán `hoanTien` (+). Cọc còn lại không nằm trong sổ công nợ: hoàn cọc cập nhật `HopDong.tienCocDaHoan`. Cả hai đều tạo phiếu chi trong module thu/chi.
 
 ### 8. `ngayThanhToan` của hợp đồng là nguồn sự thật cho ngày thu
 
@@ -173,7 +173,7 @@ Endpoint `GET /api/hop-dong/[id]/tinh-tien-chot?ngay&chiSoDien&chiSoNuoc` trả 
 
 **Alternatives**: Sửa số tiền thanh toán bằng đúng số nợ — sai lệch với tiền thực nhận, khó đối soát quỹ.
 
-### 9. Ghi nhất quán khi không có transaction
+### 9. Ghi nhất quán khi không có transaction (đã triển khai)
 
 **Chọn**: Dùng `session.withTransaction` khi MongoDB hỗ trợ (phát hiện qua `hello.setName`); nếu không (Docker local), ghi tuần tự theo thứ tự an toàn (tạo tài liệu mới trước, cập nhật trạng thái cuối) và luôn kết thúc bằng `recomputeCongNo`. Nghiệp vụ chuyển/trả phòng lưu `maThaoTac` (idempotency key do client sinh) để gọi lại không tạo trùng.
 

@@ -55,7 +55,7 @@ export interface HoaDonInput {
   hinhThucThanhToan?: string | null;
 }
 
-interface HopDongLean {
+export interface HopDongLean {
   _id: OID;
   maHopDong: string;
   phong: { _id: OID; maPhong: string } | OID;
@@ -78,7 +78,7 @@ const soNguyen = (v: unknown, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-function chuanHoaPhi(list: Array<Partial<DongPhi>>): DongPhi[] {
+export function chuanHoaPhi(list: Array<Partial<DongPhi>>): DongPhi[] {
   return list
     .filter((p) => p && typeof p.ten === 'string' && p.ten.trim())
     .map((p) => {
@@ -89,7 +89,7 @@ function chuanHoaPhi(list: Array<Partial<DongPhi>>): DongPhi[] {
     });
 }
 
-function chuanHoaGiamTru(list: Array<Partial<DongGiamTru>>): DongGiamTru[] {
+export function chuanHoaGiamTru(list: Array<Partial<DongGiamTru>>): DongGiamTru[] {
   return list
     .filter((g) => g && typeof g.ten === 'string' && g.ten.trim())
     .map((g) => {
@@ -99,7 +99,7 @@ function chuanHoaGiamTru(list: Array<Partial<DongGiamTru>>): DongGiamTru[] {
     });
 }
 
-function tinhTieuThu(ten: 'điện' | 'nước', dau: number, cuoi: number, nhapTay?: number) {
+export function tinhTieuThu(ten: 'điện' | 'nước', dau: number, cuoi: number, nhapTay?: number) {
   if (cuoi >= dau) return cuoi - dau;
   if (nhapTay !== undefined && nhapTay !== null && Number.isFinite(Number(nhapTay)) && Number(nhapTay) >= 0) {
     return soNguyen(nhapTay);
@@ -110,7 +110,7 @@ function tinhTieuThu(ten: 'điện' | 'nước', dau: number, cuoi: number, nhap
   );
 }
 
-function tinhTong(
+export function tinhTong(
   p: { tienPhong: number; tienDien: number; tienNuoc: number; phiDichVu: DongPhi[]; khoanGiamTru: DongGiamTru[] },
   lamTron: boolean,
 ) {
@@ -121,18 +121,18 @@ function tinhTong(
   return { truocLamTron, tongTien, tienLamTron: tongTien - truocLamTron };
 }
 
-async function taiHopDong(hopDongId: string): Promise<HopDongLean> {
+export async function taiHopDong(hopDongId: string): Promise<HopDongLean> {
   if (!mongoose.Types.ObjectId.isValid(hopDongId)) throw new LapHoaDonError('Hợp đồng không hợp lệ');
   const hd = await HopDong.findById(hopDongId).populate('phong', 'maPhong').lean<HopDongLean | null>();
   if (!hd) throw new LapHoaDonError('Hợp đồng không tồn tại', 404);
   return hd;
 }
 
-const phongId = (hd: HopDongLean) => ('_id' in hd.phong ? hd.phong._id : hd.phong) as OID;
-const maPhong = (hd: HopDongLean) => ('maPhong' in hd.phong ? hd.phong.maPhong : '');
+export const phongId = (hd: HopDongLean) => ('_id' in hd.phong ? hd.phong._id : hd.phong) as OID;
+export const maPhong = (hd: HopDongLean) => ('maPhong' in hd.phong ? hd.phong.maPhong : '');
 
 /** Hóa đơn gần nhất của hợp đồng (để lấy chỉ số đầu kỳ). */
-async function hoaDonGanNhat(hopDongId: OID, truocKy?: Date) {
+export async function hoaDonGanNhat(hopDongId: OID, truocKy?: Date) {
   const filter: Record<string, unknown> = { hopDong: hopDongId };
   if (truocKy) filter.$or = [{ kyBatDau: { $lt: truocKy } }, { kyBatDau: null }];
   return HoaDon.findOne(filter)
@@ -310,7 +310,7 @@ export async function tinhHoaDonHangThang(input: HoaDonInput, batBuocChiSo = fal
   };
 }
 
-async function sinhMaHoaDon(nam: number, thang: number, maPhongStr: string) {
+export async function sinhMaHoaDon(nam: number, thang: number, maPhongStr: string) {
   const goc = `HD${nam}${String(thang).padStart(2, '0')}${(maPhongStr || 'P').toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
   let ma = goc;
   for (let i = 2; await HoaDon.exists({ maHoaDon: ma }); i++) ma = `${goc}-${i}`;

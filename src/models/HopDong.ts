@@ -27,6 +27,12 @@ export interface IHopDong extends Document {
   hopDongSau?: mongoose.Types.ObjectId | null;
   lyDoKetThuc?: 'hetHan' | 'traPhong' | 'chuyenPhong' | 'huy' | null;
   ngayTraPhong?: Date | null;
+  /** Phần cọc đã dùng trừ nợ khi trả phòng */
+  tienCocDaTru?: number;
+  /** Phần cọc đã hoàn lại cho khách */
+  tienCocDaHoan?: number;
+  /** Khóa idempotency của thao tác chuyển / trả phòng */
+  maThaoTacThanhLy?: string | null;
   fileHopDong?: string;
   ngayTao: Date;
   ngayCapNhat: Date;
@@ -142,6 +148,9 @@ const HopDongSchema = new Schema<IHopDong>({
     default: null
   },
   ngayTraPhong: { type: Date, default: null },
+  tienCocDaTru: { type: Number, default: 0, min: 0 },
+  tienCocDaHoan: { type: Number, default: 0, min: 0 },
+  maThaoTacThanhLy: { type: String, default: null },
   fileHopDong: {
     type: String,
     trim: true

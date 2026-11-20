@@ -37,11 +37,14 @@ import {
   Trash2,
   Users,
   Building2,
-  Home
+  Home,
+  ArrowRightLeft,
+  LogOut,
 } from 'lucide-react';
 import { HopDong, Phong, KhachThue, ToaNha } from '@/types';
 import { HopDongDataTable } from './table';
 import { toast } from 'sonner';
+import { ThanhLyDialog, type LoaiThanhLy } from '@/components/hop-dong/thanh-ly-dialog';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -63,6 +66,7 @@ export default function HopDongPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [toaNhaFilter, setToaNhaFilter] = useState<string>('all');
   const [viewingHopDong, setViewingHopDong] = useState<HopDong | null>(null);
+  const [thanhLy, setThanhLy] = useState<{ hopDong: HopDong; loai: LoaiThanhLy } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,6 +168,8 @@ export default function HopDongPage() {
         return <Badge variant="destructive">Hết hạn</Badge>;
       case 'daHuy':
         return <Badge variant="secondary">Đã hủy</Badge>;
+      case 'daThanhLy':
+        return <Badge variant="outline" className="border-slate-400 text-slate-700">Đã thanh lý</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -1065,6 +1071,35 @@ export default function HopDongPage() {
                   </div>
                 </div>
 
+                {(viewingHopDong.lyDoKetThuc || viewingHopDong.hopDongTruoc || viewingHopDong.hopDongSau) && (
+                  <div className="rounded-md border bg-slate-50 p-3 text-sm space-y-1">
+                    {viewingHopDong.lyDoKetThuc && viewingHopDong.ngayTraPhong && (
+                      <p>
+                        {viewingHopDong.lyDoKetThuc === 'chuyenPhong' ? 'Đã chuyển phòng' : viewingHopDong.lyDoKetThuc === 'traPhong' ? 'Đã trả phòng' : 'Kết thúc'}
+                        {' '}ngày {new Date(viewingHopDong.ngayTraPhong).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
+                        {(viewingHopDong.tienCocDaTru || viewingHopDong.tienCocDaHoan)
+                          ? ` · cọc đã trừ nợ ${formatCurrency(viewingHopDong.tienCocDaTru || 0)}, đã hoàn ${formatCurrency(viewingHopDong.tienCocDaHoan || 0)}`
+                          : ''}
+                      </p>
+                    )}
+                    {[['Hợp đồng trước', viewingHopDong.hopDongTruoc], ['Hợp đồng sau', viewingHopDong.hopDongSau]].map(([nhan, id]) => {
+                      if (!id) return null;
+                      const lienKet = hopDongList.find(h => h._id === id);
+                      return (
+                        <p key={nhan as string}>
+                          {nhan as string}:{' '}
+                          <button type="button" className="text-primary hover:underline" onClick={() => lienKet && setViewingHopDong(lienKet)}>
+                            {lienKet ? `${lienKet.maHopDong} · P.${getPhongName(lienKet.phong as string | { maPhong: string })}` : String(id)}
+                          </button>
+                        </p>
+                      );
+                    })}
+                    {viewingHopDong.lyDoKetThuc && (
+                      <p className="text-xs text-muted-foreground">Hóa đơn chốt phòng có mã bắt đầu bằng &quot;CP&quot; ở trang Hóa đơn.</p>
+                    )}
+                  </div>
+                )}
+
                 {viewingHopDong.phiDichVu.length > 0 && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500">Phí dịch vụ</Label>
@@ -1190,6 +1225,8 @@ export default function HopDongPage() {
             onGiaHan={handleGiaHan}
             onHuy={handleHuy}
             onClone={handleClone}
+            onChuyenPhong={(hd) => setThanhLy({ hopDong: hd, loai: 'chuyenPhong' })}
+            onTraPhong={(hd) => setThanhLy({ hopDong: hd, loai: 'traPhong' })}
             actionLoading={actionLoading}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
@@ -1230,6 +1267,7 @@ export default function HopDongPage() {
                 <SelectItem value="hoatDong" className="text-sm">Hoạt động</SelectItem>
                 <SelectItem value="hetHan" className="text-sm">Hết hạn</SelectItem>
                 <SelectItem value="daHuy" className="text-sm">Đã hủy</SelectItem>
+                <SelectItem value="daThanhLy" className="text-sm">Đã thanh lý</SelectItem>
               </SelectContent>
             </Select>
             <Select value={toaNhaFilter} onValueChange={setToaNhaFilter}>
@@ -1277,6 +1315,8 @@ export default function HopDongPage() {
                             return <Badge variant="destructive" className="text-xs">Hết hạn</Badge>;
                           case 'daHuy':
                             return <Badge variant="secondary" className="text-xs">Đã hủy</Badge>;
+                          case 'daThanhLy':
+                            return <Badge variant="outline" className="text-xs">Đã thanh lý</Badge>;
                           default:
                             return <Badge variant="outline" className="text-xs">{hopDong.trangThai}</Badge>;
                         }
@@ -1362,6 +1402,16 @@ export default function HopDongPage() {
                       Tải
                     </Button>
                   </div>
+                  {hopDong.trangThai === 'hoatDong' && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => setThanhLy({ hopDong, loai: 'chuyenPhong' })}>
+                        <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Chuyển phòng
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => setThanhLy({ hopDong, loai: 'traPhong' })}>
+                        <LogOut className="h-3.5 w-3.5 mr-1" />Trả phòng
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </Card>
             );
@@ -1376,6 +1426,20 @@ export default function HopDongPage() {
         )}
       </div>
 
+      <ThanhLyDialog
+        open={Boolean(thanhLy)}
+        loai={thanhLy?.loai ?? 'traPhong'}
+        hopDong={thanhLy ? {
+          _id: thanhLy.hopDong._id!,
+          maHopDong: thanhLy.hopDong.maHopDong,
+          maPhong: getPhongName(thanhLy.hopDong.phong as string | { maPhong: string }),
+          nguoiDaiDienId: typeof thanhLy.hopDong.nguoiDaiDien === 'object'
+            ? (thanhLy.hopDong.nguoiDaiDien as { _id: string })._id
+            : thanhLy.hopDong.nguoiDaiDien,
+        } : null}
+        onOpenChange={(o) => { if (!o) setThanhLy(null); }}
+        onDone={() => { cache.clearCache(); fetchData(true); }}
+      />
     </div>
   );
 }

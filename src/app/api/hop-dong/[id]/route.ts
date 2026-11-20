@@ -33,7 +33,7 @@ const hopDongSchema = z.object({
   chiSoNuocBanDau: z.number().min(0, 'Chỉ số nước ban đầu phải lớn hơn hoặc bằng 0'),
   phiDichVu: z.array(phiDichVuSchema).optional(),
   fileHopDong: z.string().optional(),
-  trangThai: z.enum(['hoatDong', 'hetHan', 'daHuy']).optional(),
+  trangThai: z.enum(['hoatDong', 'hetHan', 'daHuy', 'daThanhLy']).optional(),
 });
 
 // Schema cho partial update (chỉ cập nhật một số trường)
@@ -108,6 +108,22 @@ export async function PUT(
       return NextResponse.json(
         { message: 'Hợp đồng không tồn tại' },
         { status: 404 }
+      );
+    }
+
+    if (validatedData.trangThai === 'daThanhLy' && existingHopDong.trangThai !== 'daThanhLy') {
+      return NextResponse.json(
+        { message: 'Dùng chức năng Chuyển phòng / Trả phòng để thanh lý hợp đồng' },
+        { status: 400 }
+      );
+    }
+
+    // Hợp đồng đã thanh lý (chuyển / trả phòng) không được mở lại hay đổi phòng — dữ liệu chốt sẽ sai
+    if (existingHopDong.trangThai === 'daThanhLy'
+      && ((validatedData.trangThai && validatedData.trangThai !== 'daThanhLy') || validatedData.phong || validatedData.ngayBatDau)) {
+      return NextResponse.json(
+        { message: 'Hợp đồng đã thanh lý — không thể mở lại, đổi phòng hay đổi ngày bắt đầu' },
+        { status: 400 }
       );
     }
 

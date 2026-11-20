@@ -2,7 +2,7 @@
 
 ### Requirement: Hóa đơn chốt phòng
 
-Khi khách rời phòng, hệ thống SHALL lập hóa đơn `loaiHoaDon='chotPhong'` gồm điện nước từ chỉ số kỳ trước đến chỉ số chốt, và tiền phòng điều chỉnh `tienPhongTheoNgay(giaThue, daThuTienPhongDen, ngayChot)`: dương thành dòng phí `tienPhongLe`, âm thành giảm trừ "Hoàn tiền phòng chưa ở" (sửa được ở bước xem trước). Hóa đơn chốt SHALL NOT thu phí dịch vụ cố định; chỉ số chốt SHALL lưu vào `ChiSoDienNuoc` phòng cũ.
+Khi khách rời phòng, hệ thống SHALL lập hóa đơn `loaiHoaDon='chotPhong'` gồm điện nước từ chỉ số kỳ trước đến chỉ số chốt, và tiền phòng điều chỉnh `tienPhongTheoNgay(giaThue, daThuTienPhongDen, ngayChot)`: dương thành dòng phí `tienPhongLe`, âm thành giảm trừ "Hoàn tiền phòng chưa ở" (sửa được ở bước xem trước). Hóa đơn chốt SHALL NOT thu phí dịch vụ cố định.
 
 #### Scenario: Chốt phòng đã thu trước tiền phòng
 
@@ -18,6 +18,15 @@ Khi khách rời phòng, hệ thống SHALL lập hóa đơn `loaiHoaDon='chotPh
 
 - **WHEN** admin nhập chỉ số điện chốt nhỏ hơn chỉ số cuối của hóa đơn trước
 - **THEN** API trả 400 "Chỉ số chốt không được nhỏ hơn chỉ số kỳ trước (X)"
+
+### Requirement: Lưu chỉ số chốt
+
+Chỉ số chốt SHALL lưu trên hóa đơn chốt (chỉ số cuối kỳ) và làm gợi ý chỉ số bắt đầu cho hợp đồng kế tiếp của phòng. Hệ thống SHALL NOT ghi đè `ChiSoDienNuoc` của tháng (mỗi phòng một bản ghi/tháng, dành cho kỳ thu hàng tháng).
+
+#### Scenario: Gợi ý chỉ số cho người chuyển vào
+
+- **WHEN** phòng vừa có hóa đơn chốt với chỉ số điện 8.792 và có khách khác chuyển vào phòng này
+- **THEN** form chuyển phòng gợi ý chỉ số điện bắt đầu 8.792
 
 ### Requirement: Hóa đơn chốt có tổng âm
 
@@ -123,12 +132,17 @@ Khi trả phòng, hệ thống SHALL hoàn tiền phòng đã thu trước cho n
 
 ### Requirement: Hoàn tiền cho khách
 
-Hệ thống SHALL cho phép admin ghi nhận việc trả lại tiền cho khách (cọc còn lại hoặc tiền thừa) bằng bút toán `loai='hoanTien'` với `soTien` dương, đồng thời tạo phiếu chi trong module thu/chi (`PhieuThuChi.loai='chi'`) với nội dung tham chiếu hợp đồng. Số tiền hoàn từ tiền thừa SHALL không vượt quá số tiền thừa hiện có.
+Hệ thống SHALL cung cấp `POST /api/cong-no/hoan-tien` (chỉ `admin` / `chuNha`) để ghi nhận việc trả lại tiền cho khách và tạo phiếu chi trong module thu/chi. Hoàn tiền thừa SHALL ghi bút toán `hoanTien` dương, không vượt quá tiền thừa hiện có. Hoàn cọc SHALL chỉ áp dụng cho hợp đồng đã thanh lý, không vượt quá cọc còn lại (`tienCoc − tienCocDaTru − tienCocDaHoan`) và cập nhật `HopDong.tienCocDaHoan` (cọc không nằm trong sổ công nợ).
 
 #### Scenario: Hoàn tiền thừa
 
 - **WHEN** khách có số dư −445.645đ sau khi trả phòng và admin hoàn 445.645đ tiền mặt
-- **THEN** số dư khách về 0 và có phiếu chi 445.645đ "Hoàn tiền thừa – HĐ <mã>"
+- **THEN** số dư khách về 0 và có phiếu chi 445.645đ "Hoàn tiền thừa – <tên khách> – HĐ <mã>"
+
+#### Scenario: Hoàn cọc còn lại
+
+- **WHEN** hợp đồng đã trả phòng còn 690.000đ cọc và admin hoàn 690.000đ
+- **THEN** `tienCocDaHoan=690.000`, có phiếu chi "Hoàn cọc", lần hoàn tiếp theo bị từ chối (400)
 
 ### Requirement: Liên kết lịch sử hợp đồng
 

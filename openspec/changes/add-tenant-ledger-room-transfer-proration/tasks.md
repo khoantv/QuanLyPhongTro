@@ -38,15 +38,15 @@
 
 ## 4. M3 — Chuyển phòng & trả phòng (room-transfer-checkout)
 
-- [ ] 4.1 Tạo `src/lib/thanh-ly.ts`: `tinhTienChot()` (thuần, không ghi DB) và `thucHienChot()` (ghi chỉ số chốt, hóa đơn `chotPhong`, cập nhật hợp đồng), hỗ trợ transaction khi có replica set, idempotency theo `maThaoTac`
-- [ ] 4.2 `GET /api/hop-dong/[id]/tinh-tien-chot` (xem trước)
-- [ ] 4.3 `POST /api/hop-dong/[id]/chuyen-phong`: validate phòng mới trống, ngày chuyển hợp lệ; chốt phòng cũ; tạo hợp đồng mới; xử lý cọc; cập nhật trạng thái phòng/khách; recompute
-- [ ] 4.4 `POST /api/hop-dong/[id]/tra-phong`: chốt phòng, hoàn tiền phòng theo cài đặt, trừ cọc, cập nhật trạng thái phòng/khách
-- [ ] 4.5 API ghi nhận hoàn tiền (`loai='hoanTien'`) + tạo phiếu chi trong module thu/chi
-- [ ] 4.6 Unit/integration test các ví dụ trong spec: chuyển giữa kỳ (−445.645đ / 290.323đ), chuyển trước kỳ thu đầu (210.000đ), trả phòng trừ cọc, gọi lại cùng `maThaoTac`
-- [ ] 4.7 UI trang hợp đồng: nút "Chuyển phòng" và "Trả phòng" mở dialog nhiều bước (chọn phòng/ngày → nhập chỉ số chốt + chỉ số phòng mới → xem trước bảng tính → xác nhận)
-- [ ] 4.8 UI chi tiết hợp đồng/phòng: liên kết hợp đồng trước/sau, lý do kết thúc, hóa đơn chốt
-- [ ] 4.9 Cập nhật bộ lọc trạng thái hợp đồng / dashboard cho `daThanhLy`
+- [x] 4.1 Tạo `src/lib/thanh-ly.ts`: `tinhTienChot()` (thuần, không ghi DB) và `thucHienChot()` (ghi chỉ số chốt, hóa đơn `chotPhong`, cập nhật hợp đồng), hỗ trợ transaction khi có replica set, idempotency theo `maThaoTac`
+- [x] 4.2 `GET /api/hop-dong/[id]/tinh-tien-chot` (xem trước)
+- [x] 4.3 `POST /api/hop-dong/[id]/chuyen-phong`: validate phòng mới trống, ngày chuyển hợp lệ; chốt phòng cũ; tạo hợp đồng mới; xử lý cọc; cập nhật trạng thái phòng/khách; recompute
+- [x] 4.4 `POST /api/hop-dong/[id]/tra-phong`: chốt phòng, hoàn tiền phòng theo cài đặt, trừ cọc, cập nhật trạng thái phòng/khách
+- [x] 4.5 API ghi nhận hoàn tiền (`loai='hoanTien'`) + tạo phiếu chi trong module thu/chi
+- [x] 4.6 Unit/integration test các ví dụ trong spec: chuyển giữa kỳ (−445.645đ / 290.323đ), chuyển trước kỳ thu đầu (210.000đ), trả phòng trừ cọc, gọi lại cùng `maThaoTac`
+- [x] 4.7 UI trang hợp đồng: nút "Chuyển phòng" và "Trả phòng" mở dialog nhiều bước (chọn phòng/ngày → nhập chỉ số chốt + chỉ số phòng mới → xem trước bảng tính → xác nhận)
+- [x] 4.8 UI chi tiết hợp đồng: liên kết hợp đồng trước/sau, lý do kết thúc, cọc đã trừ/hoàn (trang phòng chưa làm)
+- [x] 4.9 Cập nhật bộ lọc trạng thái hợp đồng / dashboard cho `daThanhLy`
 
 ## 5. M4 — Bảng thu tiền tháng (monthly-collection-sheet)
 
@@ -64,6 +64,6 @@
 - [ ] 6.2 Chạy `scripts/migrate-cong-no.ts --dry-run` trên bản sao dữ liệu thật, rà báo cáo chênh lệch
 - [ ] 6.3 Manual test: đóng thiếu → tháng sau hiện nợ kỳ trước; đóng thừa → tháng sau trừ; đóng trước khi chưa có hóa đơn
 - [x] 6.4 Manual test: khách mới vào giữa kỳ → hóa đơn đầu có tiền phòng lẻ đúng
-- [ ] 6.5 Manual test: chuyển phòng giữa kỳ và trước kỳ thu đầu; trả phòng có/không hoàn tiền phòng, có trừ cọc
+- [x] 6.5 Manual test: chuyển phòng giữa kỳ và trước kỳ thu đầu; trả phòng có/không hoàn tiền phòng, có trừ cọc
 - [x] 6.6 Manual test: auto-invoice với hai nhóm ngày thu 10 và 21
 - [ ] 6.7 Cập nhật `README.md`: quy trình thu tiền, chuyển phòng, trả phòng, migration công nợ
