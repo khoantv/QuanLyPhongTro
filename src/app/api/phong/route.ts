@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import HoaDon from '@/models/HoaDon';
+import { soDuNhieuKhach } from '@/lib/cong-no';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
@@ -90,14 +92,33 @@ export async function GET(request: NextRequest) {
           ]
         })
         .populate('khachThueId', 'hoTen soDienThoai')
-        .populate('nguoiDaiDien', 'hoTen soDienThoai');
-        
+        .populate('nguoiDaiDien', 'hoTen soDienThoai')
+        .lean<Record<string, unknown> & { _id: { toString(): string }; nguoiDaiDien?: { _id: { toString(): string } } }>();
+
+        let hoaDonGanNhat = null;
+        if (hopDong) {
+          hoaDonGanNhat = await HoaDon.findOne({ hopDong: hopDong._id })
+            .sort({ ngayTao: -1 })
+            .select('maHoaDon thang nam loaiHoaDon tongTien conLai trangThai kyBatDau kyKetThuc')
+            .lean();
+        }
+
         return {
           ...phong.toObject(),
-          hopDongHienTai: hopDong
+          hopDongHienTai: hopDong ? { ...hopDong, hoaDonGanNhat } : null,
         };
       })
     );
+
+    // Công nợ người đại diện của các hợp đồng hiện tại (một truy vấn)
+    const daiDienIds = phongListWithContracts
+      .map((p) => p.hopDongHienTai?.nguoiDaiDien?._id?.toString())
+      .filter((x): x is string => Boolean(x));
+    const congNo = daiDienIds.length ? await soDuNhieuKhach(daiDienIds) : {};
+    for (const p of phongListWithContracts) {
+      const id = p.hopDongHienTai?.nguoiDaiDien?._id?.toString();
+      if (p.hopDongHienTai && id) (p.hopDongHienTai as Record<string, unknown>).soDuCongNo = congNo[id] ?? 0;
+    }
 
     const total = await Phong.countDocuments(query);
 
@@ -167,7 +188,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { message: error.errors[0].message },
+        { message: error.issues[0].message },
         { status: 400 }
       );
     }

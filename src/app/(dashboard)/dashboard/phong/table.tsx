@@ -59,6 +59,9 @@ import {
   VisibilityState,
 } from "@tanstack/react-table"
 
+import Link from "next/link"
+import { FilePlus2 } from "lucide-react"
+import { HopDongHienTai, linkTaoHoaDon, type HopDongHienTaiPhong } from "@/components/phong/hop-dong-hien-tai"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -317,6 +320,16 @@ const createColumns = (props: PhongTableProps): ColumnDef<Phong>[] => [
     },
   },
   {
+    id: "hopDongHienTai",
+    header: "Hợp đồng hiện tại",
+    cell: ({ row }) => (
+      <HopDongHienTai
+        hopDong={(row.original as Phong & { hopDongHienTai?: HopDongHienTaiPhong | null }).hopDongHienTai}
+        phongId={row.original._id!}
+      />
+    ),
+  },
+  {
     accessorKey: "anhPhong",
     header: "Ảnh",
     cell: ({ row }) => {
@@ -366,6 +379,14 @@ const createColumns = (props: PhongTableProps): ColumnDef<Phong>[] => [
               Xem ảnh ({row.original.anhPhong.length})
             </DropdownMenuItem>
           )}
+          {(row.original as Phong & { hopDongHienTai?: unknown }).hopDongHienTai ? (
+            <DropdownMenuItem asChild>
+              <Link href={linkTaoHoaDon(row.original._id!)}>
+                <FilePlus2 className="mr-2 h-4 w-4" />
+                Tạo hóa đơn
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onClick={() => props.onEdit(row.original)}>
             <Edit className="mr-2 h-4 w-4" />
             Chỉnh sửa

@@ -78,6 +78,13 @@ const fmtNgay = (d: string | Date) => new Date(d).toLocaleDateString('vi-VN', { 
 const toDateInput = (d: string | Date) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 const vnd = (n: number) => `${Math.round(n).toLocaleString('vi-VN')} VNĐ`;
 
+/** Hợp đồng đang hoạt động của phòng (mới nhất nếu có nhiều). */
+function hopDongCuaPhong(list: HopDong[], phongId: string): HopDong | undefined {
+  return list
+    .filter(h => h.trangThai === 'hoatDong' && (typeof h.phong === 'object' ? (h.phong as { _id?: string })._id : h.phong) === phongId)
+    .sort((a, b) => new Date(b.ngayBatDau).getTime() - new Date(a.ngayBatDau).getTime())[0];
+}
+
 export default function ThemMoiHoaDonPage() {
   const router = useRouter();
   const [hopDongList, setHopDongList] = useState<HopDong[]>([]);
@@ -131,6 +138,19 @@ export default function ThemMoiHoaDonPage() {
         setHopDongList(r.data.hopDongList || []);
         setPhongList(r.data.phongList || []);
         setKhachThueList(r.data.khachThueList || []);
+        // Mở từ trang Phòng / Hợp đồng: ?phong=<id> hoặc ?hopDong=<id>
+        const sp = new URLSearchParams(window.location.search);
+        const hds: HopDong[] = r.data.hopDongList || [];
+        const hopDongTuUrl = sp.get('hopDong');
+        const phongTuUrl = sp.get('phong');
+        const chon = hopDongTuUrl
+          ? hds.find(h => h._id === hopDongTuUrl)
+          : phongTuUrl ? hopDongCuaPhong(hds, phongTuUrl) : undefined;
+        if (chon) {
+          setFormData(prev => ({ ...prev, hopDong: chon._id!, phong: chon.phong as string }));
+        } else if (phongTuUrl || hopDongTuUrl) {
+          toast.error('Phòng này không có hợp đồng đang hoạt động');
+        }
       }
     } catch (error) {
       console.error('Error fetching form data:', error);
@@ -461,7 +481,29 @@ export default function ThemMoiHoaDonPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-sm">Phòng</Label>
-                    <Input value={getPhongName(formData.phong, phongList)} disabled className="bg-gray-50 h-10" />
+                    <Select
+                      value={formData.phong || undefined}
+                      onValueChange={(phongId) => {
+                        const hd = hopDongCuaPhong(hopDongList, phongId);
+                        if (hd) setFormData(prev => ({ ...prev, phong: phongId, hopDong: hd._id! }));
+                      }}
+                    >
+                      <SelectTrigger className="h-10"><SelectValue placeholder="Chọn phòng" /></SelectTrigger>
+                      <SelectContent>
+                        {phongList
+                          .filter(p => hopDongCuaPhong(hopDongList, p._id!))
+                          .map(p => {
+                            const hd = hopDongCuaPhong(hopDongList, p._id!)!;
+                            const toaNhaTen = typeof p.toaNha === 'object' && p.toaNha ? (p.toaNha as { tenToaNha?: string }).tenToaNha : '';
+                            return (
+                              <SelectItem key={p._id} value={p._id!}>
+                                P.{p.maPhong}{toaNhaTen ? ` · ${toaNhaTen}` : ''} — {getKhachThueName(hd.nguoiDaiDien, khachThueList)}
+                              </SelectItem>
+                            );
+                          })}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Chọn phòng sẽ tự chọn hợp đồng đang hoạt động của phòng.</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-sm">Người đại diện</Label>

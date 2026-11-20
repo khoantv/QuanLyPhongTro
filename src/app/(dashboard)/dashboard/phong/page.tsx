@@ -52,6 +52,7 @@ import { PhongImageUpload } from '@/components/ui/phong-image-upload';
 import { DeleteConfirmPopover } from '@/components/ui/delete-confirm-popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { HopDongHienTai, type HopDongHienTaiPhong } from '@/components/phong/hop-dong-hien-tai';
 
 export default function PhongPage() {
   const cache = useCache<{
@@ -534,6 +535,16 @@ export default function PhongPage() {
                       }
                       return null;
                     })()}
+
+                    {(phong as Phong & { hopDongHienTai?: HopDongHienTaiPhong | null }).hopDongHienTai && (
+                      <div className="mb-3 rounded-md border p-2">
+                        <HopDongHienTai
+                          hopDong={(phong as Phong & { hopDongHienTai?: HopDongHienTaiPhong | null }).hopDongHienTai}
+                          phongId={phong._id!}
+                          compact
+                        />
+                      </div>
+                    )}
 
                     {phong.anhPhong && phong.anhPhong.length > 0 && (
                       <div className="mb-3">
