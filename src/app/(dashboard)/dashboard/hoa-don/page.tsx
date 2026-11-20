@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { HoaDon, HopDong, Phong, KhachThue } from '@/types';
 import { toast } from 'sonner';
+import { ThuTienForm } from '@/components/cong-no/thu-tien-form';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -356,6 +357,15 @@ export default function HoaDonPage() {
             <span><strong>Tổng tiền:</strong></span>
             <span><strong>${formatCurrency(hoaDon.tongTien)}</strong></span>
           </div>
+          ${hoaDon.noKyTruoc ? `
+          <div class="item">
+            <span>${hoaDon.noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}:</span>
+            <span>${formatCurrency(hoaDon.noKyTruoc)}</span>
+          </div>
+          <div class="item">
+            <span><strong>Tổng cần thanh toán:</strong></span>
+            <span><strong>${formatCurrency(hoaDon.tongCanThanhToan ?? (hoaDon.tongTien + hoaDon.noKyTruoc))}</strong></span>
+          </div>` : ''}
           <div class="item">
             <span>Đã thanh toán:</span>
             <span>${formatCurrency(hoaDon.daThanhToan)}</span>
@@ -478,6 +488,15 @@ export default function HoaDonPage() {
               <span>Tổng tiền:</span>
               <span>${formatCurrency(hoaDon.tongTien)}</span>
             </div>
+            ${hoaDon.noKyTruoc ? `
+            <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
+              <span>${hoaDon.noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}:</span>
+              <span>${formatCurrency(hoaDon.noKyTruoc)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+              <span>Tổng cần thanh toán:</span>
+              <span>${formatCurrency(hoaDon.tongCanThanhToan ?? (hoaDon.tongTien + hoaDon.noKyTruoc))}</span>
+            </div>` : ''}
             <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
               <span>Đã thanh toán:</span>
               <span style="color: #10b981;">${formatCurrency(hoaDon.daThanhToan)}</span>
@@ -978,6 +997,18 @@ export default function HoaDonPage() {
                   <span>Tổng tiền:</span>
                   <span>{formatCurrency(viewingHoaDon.tongTien)}</span>
                 </div>
+                {Boolean(viewingHoaDon.noKyTruoc) && (
+                  <>
+                    <div className="flex justify-between text-xs md:text-sm">
+                      <span>{(viewingHoaDon.noKyTruoc ?? 0) > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}:</span>
+                      <span className={(viewingHoaDon.noKyTruoc ?? 0) > 0 ? 'text-red-600' : 'text-emerald-600'}>{formatCurrency(viewingHoaDon.noKyTruoc ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-xs md:text-sm">
+                      <span>Tổng cần thanh toán:</span>
+                      <span>{formatCurrency(viewingHoaDon.tongCanThanhToan ?? (viewingHoaDon.tongTien + (viewingHoaDon.noKyTruoc ?? 0)))}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between text-xs md:text-sm">
                   <span>Đã thanh toán:</span>
                   <span className="text-green-600">{formatCurrency(viewingHoaDon.daThanhToan)}</span>
@@ -1032,246 +1063,21 @@ export default function HoaDonPage() {
           </DialogHeader>
           
           {paymentHoaDon && (
-            <PaymentForm 
-              hoaDon={paymentHoaDon}
-              onClose={() => setIsPaymentDialogOpen(false)}
-              onSuccess={(updatedHoaDon) => {
+            <ThuTienForm
+              key={paymentHoaDon._id}
+              khachThueId={typeof paymentHoaDon.khachThue === 'object' ? (paymentHoaDon.khachThue as { _id: string })._id : paymentHoaDon.khachThue}
+              soTienGoiY={paymentHoaDon.conLai}
+              onCancel={() => setIsPaymentDialogOpen(false)}
+              onSuccess={() => {
                 setIsPaymentDialogOpen(false);
-                // Chỉ update dòng hóa đơn đó thay vì load lại toàn bộ
-                if (updatedHoaDon) {
-                  setHoaDonList(prev => prev.map(hd => 
-                    hd._id === updatedHoaDon._id ? updatedHoaDon : hd
-                  ));
-                  cache.clearCache(); // Xóa cache để lần sau load mới
-                }
+                // Thanh toán được phân bổ FIFO nên có thể cập nhật nhiều hóa đơn — tải lại danh sách
+                cache.clearCache();
+                fetchData(true);
               }}
             />
           )}
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// Payment Form Component
-function PaymentForm({ 
-  hoaDon, 
-  onClose, 
-  onSuccess 
-}: { 
-  hoaDon: HoaDon;
-  onClose: () => void;
-  onSuccess: (updatedHoaDon?: HoaDon) => void;
-}) {
-  const [formData, setFormData] = useState({
-    soTien: hoaDon.conLai, // Mặc định thanh toán toàn bộ số tiền còn lại
-    phuongThuc: 'tienMat' as 'tienMat' | 'chuyenKhoan' | 'viDienTu',
-    nganHang: '',
-    soGiaoDich: '',
-    ngayThanhToan: new Date().toISOString().split('T')[0],
-    ghiChu: '',
-    anhBienLai: '',
-  });
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    
-    try {
-      const requestData = {
-        hoaDonId: hoaDon._id,
-        soTien: formData.soTien,
-        phuongThuc: formData.phuongThuc,
-        thongTinChuyenKhoan: formData.phuongThuc === 'chuyenKhoan' ? {
-          nganHang: formData.nganHang,
-          soGiaoDich: formData.soGiaoDich
-        } : undefined,
-        ngayThanhToan: formData.ngayThanhToan,
-        ghiChu: formData.ghiChu,
-        anhBienLai: formData.anhBienLai
-      };
-      
-      console.log('Submitting payment:', requestData);
-      
-      const response = await fetch('/api/thanh-toan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        // Xóa cache và trả về dữ liệu hóa đơn đã cập nhật
-        sessionStorage.removeItem('hoa-don-data');
-        toast.success(result.message || 'Thanh toán đã được tạo thành công');
-        onSuccess(result.data?.hoaDon); // Truyền hóa đơn đã cập nhật
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Có lỗi xảy ra');
-      }
-    } catch (error) {
-      console.error('Error submitting payment:', error);
-      toast.error('Có lỗi xảy ra khi tạo thanh toán');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Thông tin hóa đơn */}
-      <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
-        <h3 className="text-sm md:text-base font-semibold mb-3">Thông tin hóa đơn</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
-          <div>
-            <span className="text-gray-600">Mã hóa đơn:</span>
-            <div className="font-medium">{hoaDon.maHoaDon}</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Tháng/Năm:</span>
-            <div className="font-medium">{hoaDon.thang}/{hoaDon.nam}</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Tổng tiền:</span>
-            <div className="font-medium">{formatCurrency(hoaDon.tongTien)}</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Đã thanh toán:</span>
-            <div className="font-medium text-green-600">{formatCurrency(hoaDon.daThanhToan)}</div>
-          </div>
-          <div className="col-span-2">
-            <span className="text-gray-600">Còn lại:</span>
-            <div className="font-medium text-red-600 text-lg">{formatCurrency(hoaDon.conLai)}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Form thanh toán */}
-      <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="soTien" className="text-xs md:text-sm">Số tiền thanh toán (VNĐ) *</Label>
-          <Input
-            id="soTien"
-            type="number"
-            min="1"
-            max={hoaDon.conLai}
-            value={formData.soTien}
-            onChange={(e) => setFormData(prev => ({ ...prev, soTien: parseInt(e.target.value) || 0 }))}
-            required
-            className="text-base md:text-lg"
-          />
-          <div className="text-[10px] md:text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md">
-            💰 Tối đa có thể thanh toán: <span className="font-semibold">{formatCurrency(hoaDon.conLai)}</span>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="phuongThuc" className="text-xs md:text-sm">Phương thức thanh toán *</Label>
-          <Select value={formData.phuongThuc} onValueChange={(value) => setFormData(prev => ({ ...prev, phuongThuc: value as 'tienMat' | 'chuyenKhoan' | 'viDienTu' }))}>
-            <SelectTrigger className="h-10 md:h-12 text-sm">
-              <SelectValue placeholder="Chọn phương thức thanh toán" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tienMat" className="text-sm">💵 Tiền mặt</SelectItem>
-              <SelectItem value="chuyenKhoan" className="text-sm">🏦 Chuyển khoản</SelectItem>
-              <SelectItem value="viDienTu" className="text-sm">📱 Ví điện tử</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {formData.phuongThuc === 'chuyenKhoan' && (
-          <div className="space-y-3 md:space-y-4 p-3 md:p-4 bg-green-50 rounded-lg border border-green-200">
-            <h4 className="text-xs md:text-sm font-semibold text-green-800 flex items-center gap-2">
-              🏦 Thông tin chuyển khoản
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="nganHang" className="text-xs md:text-sm">Ngân hàng</Label>
-                <Input
-                  id="nganHang"
-                  value={formData.nganHang}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nganHang: e.target.value }))}
-                  placeholder="Ví dụ: Vietcombank, BIDV..."
-                  className="text-sm"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="soGiaoDich" className="text-xs md:text-sm">Số giao dịch/Mã tham chiếu</Label>
-                <Input
-                  id="soGiaoDich"
-                  value={formData.soGiaoDich}
-                  onChange={(e) => setFormData(prev => ({ ...prev, soGiaoDich: e.target.value }))}
-                  placeholder="Mã giao dịch từ ngân hàng"
-                  className="text-sm"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="ngayThanhToan" className="text-xs md:text-sm">Ngày thanh toán *</Label>
-            <Input
-              id="ngayThanhToan"
-              type="date"
-              value={formData.ngayThanhToan}
-              onChange={(e) => setFormData(prev => ({ ...prev, ngayThanhToan: e.target.value }))}
-              required
-              className="h-10 md:h-12 text-sm"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ghiChu" className="text-xs md:text-sm">Ghi chú</Label>
-            <Input
-              id="ghiChu"
-              value={formData.ghiChu}
-              onChange={(e) => setFormData(prev => ({ ...prev, ghiChu: e.target.value }))}
-              placeholder="Ghi chú về giao dịch..."
-              className="h-10 md:h-12 text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-xs md:text-sm">Ảnh biên lai thanh toán</Label>
-          <ImageUpload
-            imageUrl={formData.anhBienLai}
-            onImageChange={(url) => setFormData(prev => ({ ...prev, anhBienLai: url }))}
-            placeholder="Chọn ảnh biên lai thanh toán"
-          />
-          <div className="text-[10px] md:text-xs text-gray-500">
-            📷 Tải lên ảnh biên lai để xác nhận giao dịch (tùy chọn)
-          </div>
-        </div>
-
-        <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 md:pt-6 border-t">
-          <Button 
-            type="button" 
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={submitting}
-            className="w-full sm:w-auto sm:min-w-[100px]"
-          >
-            Hủy
-          </Button>
-          <Button 
-            type="submit"
-            size="sm"
-            disabled={submitting}
-            className="w-full sm:w-auto sm:min-w-[160px]"
-          >
-            <CreditCard className="h-3 w-3 md:h-4 md:w-4 mr-2" />
-            {submitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
-          </Button>
-        </DialogFooter>
-      </form>
     </div>
   );
 }

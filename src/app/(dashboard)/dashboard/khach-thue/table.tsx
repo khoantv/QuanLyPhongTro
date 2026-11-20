@@ -44,6 +44,8 @@ import {
   Key,
   Check,
   X,
+  Wallet,
+  HandCoins,
 } from "lucide-react"
 import {
   ColumnDef,
@@ -63,6 +65,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { ZaloFollowBadge } from "@/components/zalo-follow-badge"
+import { SoDuBadge } from "@/components/cong-no/so-du"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -140,6 +143,9 @@ function DragHandle({ id }: { id: string }) {
 }
 
 type KhachThueTableProps = {
+  congNo?: Record<string, number>
+  onCongNo?: (khachThue: KhachThue) => void
+  onThuTien?: (khachThue: KhachThue) => void
   onView?: (khachThue: KhachThue) => void
   onEdit: (khachThue: KhachThue) => void
   onDelete: (id: string) => void
@@ -318,6 +324,21 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
     cell: ({ row }) => getStatusBadge(row.original.trangThai),
   },
   {
+    id: "congNo",
+    accessorFn: (row) => props.congNo?.[row._id!] ?? 0,
+    header: "Công nợ",
+    cell: ({ row }) => (
+      <button
+        type="button"
+        className="cursor-pointer"
+        onClick={() => props.onCongNo?.(row.original)}
+        title="Xem công nợ"
+      >
+        <SoDuBadge soDu={props.congNo ? (props.congNo[row.original._id!] ?? 0) : null} />
+      </button>
+    ),
+  },
+  {
     id: "actions",
     cell: ({ row }) => (
       <DropdownMenu>
@@ -336,6 +357,18 @@ const createColumns = (props: KhachThueTableProps): ColumnDef<KhachThue>[] => [
             <DropdownMenuItem onClick={() => props.onView!(row.original)}>
               <Eye className="mr-2 h-4 w-4" />
               Xem chi tiết
+            </DropdownMenuItem>
+          )}
+          {props.onCongNo && (
+            <DropdownMenuItem onClick={() => props.onCongNo!(row.original)}>
+              <Wallet className="mr-2 h-4 w-4" />
+              Công nợ
+            </DropdownMenuItem>
+          )}
+          {props.onThuTien && (
+            <DropdownMenuItem onClick={() => props.onThuTien!(row.original)}>
+              <HandCoins className="mr-2 h-4 w-4" />
+              Thu tiền
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={() => props.onEdit(row.original)}>
@@ -389,10 +422,12 @@ type KhachThueDataTableProps = KhachThueTableProps & {
   onSearchChange?: (value: string) => void
   selectedTrangThai?: string
   onTrangThaiChange?: (value: string) => void
+  congNoFilter?: string
+  onCongNoFilterChange?: (value: string) => void
 }
 
 export function KhachThueDataTable(props: KhachThueDataTableProps) {
-  const { data: initialData, searchTerm, onSearchChange, selectedTrangThai, onTrangThaiChange, ...tableProps } = props
+  const { data: initialData, searchTerm, onSearchChange, selectedTrangThai, onTrangThaiChange, congNoFilter, onCongNoFilterChange, ...tableProps } = props
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -490,6 +525,18 @@ export function KhachThueDataTable(props: KhachThueDataTableProps) {
               <SelectItem value="chuaThue">Chưa thuê</SelectItem>
             </SelectContent>
           </Select>
+          {onCongNoFilterChange && (
+            <Select value={congNoFilter || 'all'} onValueChange={onCongNoFilterChange}>
+              <SelectTrigger className="w-full sm:w-[170px]">
+                <SelectValue placeholder="Công nợ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Mọi công nợ</SelectItem>
+                <SelectItem value="dangNo">Đang nợ</SelectItem>
+                <SelectItem value="tienThua">Có tiền thừa</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
         
         {/* Tùy chỉnh cột bên phải */}

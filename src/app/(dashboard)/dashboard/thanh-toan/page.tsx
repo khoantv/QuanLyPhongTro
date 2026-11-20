@@ -53,10 +53,12 @@ import {
 import { ThanhToan, HoaDon } from '@/types';
 import { toast } from 'sonner';
 import { ThanhToanDataTable } from './table';
+import { ThuTienForm, type ThanhToanDangSua } from '@/components/cong-no/thu-tien-form';
 
 // Type cho ThanhToan đã được populate
-type ThanhToanPopulated = Omit<ThanhToan, 'hoaDon'> & {
-  hoaDon: string | HoaDon;
+type ThanhToanPopulated = Omit<ThanhToan, 'hoaDon' | 'khachThue'> & {
+  hoaDon?: string | HoaDon | null;
+  khachThue?: string | { _id: string; hoTen: string; soDienThoai?: string } | null;
 };
 
 export default function ThanhToanPage() {
@@ -140,7 +142,10 @@ export default function ThanhToanPage() {
   };
 
   const filteredThanhToan = thanhToanList.filter(thanhToan => {
-    const matchesSearch = thanhToan.ghiChu?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const tenKhach = thanhToan.khachThue && typeof thanhToan.khachThue === 'object' ? thanhToan.khachThue.hoTen : '';
+    const matchesSearch = !searchTerm ||
+                         tenKhach.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         thanhToan.ghiChu?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          thanhToan.thongTinChuyenKhoan?.soGiaoDich?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesMethod = methodFilter === 'all' || thanhToan.phuongThuc === methodFilter;
     const matchesDate = dateFilter === 'all' || 
@@ -286,10 +291,10 @@ export default function ThanhToanPage() {
               </DialogDescription>
             </DialogHeader>
             
-            <ThanhToanForm 
-              thanhToan={editingThanhToan}
-              hoaDonList={hoaDonList}
-              onClose={() => setIsDialogOpen(false)}
+            <ThuTienForm
+              key={editingThanhToan?._id ?? 'new'}
+              thanhToan={editingThanhToan as ThanhToanDangSua | null}
+              onCancel={() => setIsDialogOpen(false)}
               onSuccess={() => {
                 cache.clearCache();
                 setIsDialogOpen(false);
@@ -422,9 +427,11 @@ export default function ThanhToanPage() {
         {/* Mobile Card List */}
         <div className="space-y-3">
           {filteredThanhToan.map((thanhToan) => {
-            const hoaDonInfo = typeof thanhToan.hoaDon === 'object' ? (thanhToan.hoaDon as HoaDon) : null;
+            const hoaDonInfo = thanhToan.hoaDon && typeof thanhToan.hoaDon === 'object' ? (thanhToan.hoaDon as HoaDon) : null;
             const phongInfo = hoaDonInfo && typeof hoaDonInfo.phong === 'object' ? (hoaDonInfo.phong as any) : null;
-            const khachThueInfo = hoaDonInfo && typeof hoaDonInfo.khachThue === 'object' ? (hoaDonInfo.khachThue as any) : null;
+            const khachThueInfo = (thanhToan.khachThue && typeof thanhToan.khachThue === 'object')
+              ? thanhToan.khachThue
+              : (hoaDonInfo && typeof hoaDonInfo.khachThue === 'object' ? (hoaDonInfo.khachThue as any) : null);
             
             return (
               <Card key={thanhToan._id} className="p-4">
@@ -433,7 +440,7 @@ export default function ThanhToanPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-medium text-gray-900">
-                        {hoaDonInfo?.maHoaDon || getHoaDonInfo(thanhToan.hoaDon)}
+                        {hoaDonInfo?.maHoaDon || (thanhToan.hoaDon ? getHoaDonInfo(thanhToan.hoaDon) : `Đóng trước — ${khachThueInfo?.hoTen ?? ''}`)}
                       </h3>
                       <p className="text-sm text-gray-500">
                         {new Date(thanhToan.ngayThanhToan).toLocaleDateString('vi-VN')}
@@ -530,216 +537,5 @@ export default function ThanhToanPage() {
         )}
       </div>
     </div>
-  );
-}
-
-// Form component for adding/editing thanh toan
-function ThanhToanForm({ 
-  thanhToan, 
-  hoaDonList,
-  onClose, 
-  onSuccess 
-}: { 
-  thanhToan: ThanhToanPopulated | null;
-  hoaDonList: HoaDon[];
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [formData, setFormData] = useState({
-    hoaDon: thanhToan?.hoaDon ? 
-      (typeof thanhToan.hoaDon === 'string' ? thanhToan.hoaDon : (thanhToan.hoaDon as HoaDon)._id || '') : '',
-    soTien: thanhToan?.soTien || 0,
-    phuongThuc: thanhToan?.phuongThuc || 'tienMat',
-    nganHang: thanhToan?.thongTinChuyenKhoan?.nganHang || '',
-    soGiaoDich: thanhToan?.thongTinChuyenKhoan?.soGiaoDich || '',
-    ngayThanhToan: thanhToan?.ngayThanhToan ? new Date(thanhToan.ngayThanhToan).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    ghiChu: thanhToan?.ghiChu || '',
-    anhBienLai: thanhToan?.anhBienLai || '',
-  });
-
-  // Cập nhật form data khi thanhToan thay đổi
-  useEffect(() => {
-    if (thanhToan) {
-      setFormData({
-        hoaDon: typeof thanhToan.hoaDon === 'string' ? thanhToan.hoaDon : (thanhToan.hoaDon as HoaDon)._id || '',
-        soTien: thanhToan.soTien,
-        phuongThuc: thanhToan.phuongThuc,
-        nganHang: thanhToan.thongTinChuyenKhoan?.nganHang || '',
-        soGiaoDich: thanhToan.thongTinChuyenKhoan?.soGiaoDich || '',
-        ngayThanhToan: new Date(thanhToan.ngayThanhToan).toISOString().split('T')[0],
-        ghiChu: thanhToan.ghiChu || '',
-        anhBienLai: thanhToan.anhBienLai || '',
-      });
-    } else {
-      // Reset form khi thêm mới
-      setFormData({
-        hoaDon: '',
-        soTien: 0,
-        phuongThuc: 'tienMat',
-        nganHang: '',
-        soGiaoDich: '',
-        ngayThanhToan: new Date().toISOString().split('T')[0],
-        ghiChu: '',
-        anhBienLai: '',
-      });
-    }
-  }, [thanhToan]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      const requestData = {
-        hoaDonId: formData.hoaDon,
-        soTien: formData.soTien,
-        phuongThuc: formData.phuongThuc,
-        thongTinChuyenKhoan: formData.phuongThuc === 'chuyenKhoan' ? {
-          nganHang: formData.nganHang,
-          soGiaoDich: formData.soGiaoDich
-        } : undefined,
-        ngayThanhToan: formData.ngayThanhToan,
-        ghiChu: formData.ghiChu,
-        anhBienLai: formData.anhBienLai
-      };
-      
-      console.log('Submitting:', requestData);
-      
-      const url = thanhToan ? `/api/thanh-toan/${thanhToan._id}` : '/api/thanh-toan';
-      const method = thanhToan ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Success:', result);
-        onSuccess();
-      } else {
-        const errorData = await response.json();
-        console.error('Error:', errorData);
-        alert('Có lỗi xảy ra: ' + (errorData.message || 'Không thể lưu dữ liệu'));
-      }
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      alert('Có lỗi xảy ra khi gửi dữ liệu');
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="hoaDon" className="text-xs md:text-sm">Hóa đơn</Label>
-        <Select value={formData.hoaDon} onValueChange={(value) => setFormData(prev => ({ ...prev, hoaDon: value }))}>
-          <SelectTrigger className="text-sm">
-            <SelectValue placeholder="Chọn hóa đơn" />
-          </SelectTrigger>
-          <SelectContent>
-            {hoaDonList.map((hoaDon) => (
-              <SelectItem key={hoaDon._id} value={hoaDon._id!} className="text-sm">
-                {hoaDon.maHoaDon} - {hoaDon.conLai.toLocaleString('vi-VN')} VNĐ còn lại
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="soTien" className="text-xs md:text-sm">Số tiền (VNĐ)</Label>
-        <Input
-          id="soTien"
-          type="number"
-          min="1"
-          value={formData.soTien}
-          onChange={(e) => setFormData(prev => ({ ...prev, soTien: parseInt(e.target.value) || 0 }))}
-          required
-          className="text-sm"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="phuongThuc" className="text-xs md:text-sm">Phương thức thanh toán</Label>
-        <Select value={formData.phuongThuc} onValueChange={(value) => setFormData(prev => ({ ...prev, phuongThuc: value as any }))}>
-          <SelectTrigger className="text-sm">
-            <SelectValue placeholder="Chọn phương thức" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="tienMat" className="text-sm">Tiền mặt</SelectItem>
-            <SelectItem value="chuyenKhoan" className="text-sm">Chuyển khoản</SelectItem>
-            <SelectItem value="viDienTu" className="text-sm">Ví điện tử</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {formData.phuongThuc === 'chuyenKhoan' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="nganHang" className="text-xs md:text-sm">Ngân hàng</Label>
-            <Input
-              id="nganHang"
-              value={formData.nganHang}
-              onChange={(e) => setFormData(prev => ({ ...prev, nganHang: e.target.value }))}
-              placeholder="Tên ngân hàng"
-              className="text-sm"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="soGiaoDich" className="text-xs md:text-sm">Số giao dịch</Label>
-            <Input
-              id="soGiaoDich"
-              value={formData.soGiaoDich}
-              onChange={(e) => setFormData(prev => ({ ...prev, soGiaoDich: e.target.value }))}
-              placeholder="Mã giao dịch"
-              className="text-sm"
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label htmlFor="ngayThanhToan" className="text-xs md:text-sm">Ngày thanh toán</Label>
-        <Input
-          id="ngayThanhToan"
-          type="date"
-          value={formData.ngayThanhToan}
-          onChange={(e) => setFormData(prev => ({ ...prev, ngayThanhToan: e.target.value }))}
-          required
-          className="text-sm"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="ghiChu" className="text-xs md:text-sm">Ghi chú</Label>
-        <Textarea
-          id="ghiChu"
-          value={formData.ghiChu}
-          onChange={(e) => setFormData(prev => ({ ...prev, ghiChu: e.target.value }))}
-          rows={3}
-          placeholder="Ghi chú về giao dịch..."
-          className="text-sm"
-        />
-      </div>
-
-      <ImageUpload
-        imageUrl={formData.anhBienLai}
-        onImageChange={(url) => setFormData(prev => ({ ...prev, anhBienLai: url }))}
-        label="Ảnh biên lai"
-        placeholder="Chọn ảnh biên lai thanh toán"
-      />
-
-      <DialogFooter className="flex-col sm:flex-row gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onClose} className="w-full sm:w-auto">
-          Hủy
-        </Button>
-        <Button type="submit" size="sm" className="w-full sm:w-auto">
-          {thanhToan ? 'Cập nhật' : 'Thêm mới'}
-        </Button>
-      </DialogFooter>
-    </form>
   );
 }

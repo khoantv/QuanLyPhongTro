@@ -15,6 +15,7 @@ const updateSchema = z.object({
   lamTronHoaDon: z.boolean().optional(),
   hinhThucThanhToanMacDinh: z.enum(['tienMat', 'chuyenKhoan', 'momo', 'vnpay', 'khac']).optional(),
   ghiChuMacDinh: z.string().max(500).optional(),
+  xuLyTienThuaMacDinh: z.enum(['truKySau', 'khongTru']).optional(),
 });
 
 function isPriviledged(role?: string | null) {

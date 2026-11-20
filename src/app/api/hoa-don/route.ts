@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import HoaDon from '@/models/HoaDon';
 import HopDong from '@/models/HopDong';
+import '@/models/Phong';
+import '@/models/KhachThue';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { ghiNhanHoaDonMoi, capNhatButToanHoaDon, huyButToanHoaDon } from '@/lib/cong-no';
 import { PhiDichVu } from '@/types';
 
 // GET - Lấy danh sách hóa đơn
@@ -287,6 +290,11 @@ export async function POST(request: NextRequest) {
     const hoaDon = new HoaDon(hoaDonData);
     await hoaDon.save();
 
+    // Ghi vào sổ công nợ: lưu nợ kỳ trước, tạo bút toán và phân bổ tiền thừa/đóng trước (nếu có)
+    await ghiNhanHoaDonMoi(hoaDon, session.user.id);
+    const congNoMoi = await HoaDon.findById(hoaDon._id).select('noKyTruoc tongCanThanhToan daThanhToan conLai trangThai').lean<Record<string, unknown>>();
+    if (congNoMoi) hoaDon.set(congNoMoi);
+
     // Populate để trả về dữ liệu đầy đủ
     await hoaDon.populate([
       { path: 'hopDong', select: 'maHopDong' },
@@ -363,11 +371,10 @@ export async function PUT(request: NextRequest) {
       chiSoNuocBanDau,
       chiSoNuocCuoiKy,
       phiDichVu,
-      daThanhToan,
-      trangThai,
       hanThanhToan,
       ghiChu
     } = body;
+    // daThanhToan / conLai / trangThai do sổ công nợ tính — bỏ qua giá trị client gửi lên.
 
     // Validate required fields
     if (!id) {
@@ -409,7 +416,6 @@ export async function PUT(request: NextRequest) {
     const tienNuocTinh = soNuoc * hopDongData.giaNuoc;
 
     const tongTien = tienPhong + tienDienTinh + tienNuocTinh + (phiDichVu?.reduce((sum: number, phi: PhiDichVu) => sum + phi.gia, 0) || 0);
-    const conLai = tongTien - daThanhToan;
 
     // Cập nhật hóa đơn
     const updatedHoaDon = await HoaDon.findByIdAndUpdate(
@@ -430,9 +436,7 @@ export async function PUT(request: NextRequest) {
         chiSoNuocCuoiKy,
         phiDichVu: phiDichVu || [],
         tongTien,
-        daThanhToan,
-        conLai,
-        trangThai,
+        tongCanThanhToan: tongTien + (existingHoaDon.noKyTruoc || 0),
         hanThanhToan: new Date(hanThanhToan),
         ghiChu
       },
@@ -443,9 +447,23 @@ export async function PUT(request: NextRequest) {
       { path: 'khachThue', select: 'hoTen soDienThoai' }
     ]);
 
+    if (updatedHoaDon) {
+      await capNhatButToanHoaDon(
+        { _id: updatedHoaDon._id, khachThue: existingHoaDon.khachThue, hopDong: existingHoaDon.hopDong, phong: existingHoaDon.phong, maHoaDon: updatedHoaDon.maHoaDon, tongTien },
+        session.user.id,
+      );
+    }
+    const hoaDonSauCapNhat = updatedHoaDon
+      ? await HoaDon.findById(updatedHoaDon._id).populate([
+        { path: 'hopDong', select: 'maHopDong' },
+        { path: 'phong', select: 'maPhong' },
+        { path: 'khachThue', select: 'hoTen soDienThoai' }
+      ])
+      : null;
+
     return NextResponse.json({
       success: true,
-      data: updatedHoaDon,
+      data: hoaDonSauCapNhat,
       message: 'Cập nhật hóa đơn thành công'
     });
   } catch (error) {
@@ -488,6 +506,8 @@ export async function DELETE(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    await huyButToanHoaDon(deletedHoaDon, session.user.id);
 
     return NextResponse.json({
       success: true,

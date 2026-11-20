@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Send, Eye, Info, Save, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ZaloPreviewModal } from '@/components/zalo-preview-modal';
-import type { CaiDatHoaDon, HinhThucThanhToan } from '@/types';
+import type { CaiDatHoaDon, HinhThucThanhToan, XuLyTienThua } from '@/types';
 
 interface HoaDonOption { _id: string; maHoaDon: string }
 
@@ -72,6 +72,7 @@ export default function CaiDatHoaDonPage() {
           lamTronHoaDon: settings.lamTronHoaDon,
           hinhThucThanhToanMacDinh: settings.hinhThucThanhToanMacDinh,
           ghiChuMacDinh: settings.ghiChuMacDinh,
+          xuLyTienThuaMacDinh: settings.xuLyTienThuaMacDinh,
         }),
       });
       const r = await res.json();
@@ -256,6 +257,27 @@ export default function CaiDatHoaDonPage() {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Tiền khách đóng thừa */}
+      <div className="border-t pt-6 space-y-2">
+        <Label>Tiền khách đóng thừa</Label>
+        <Select
+          value={settings.xuLyTienThuaMacDinh ?? 'truKySau'}
+          onValueChange={(v) => update('xuLyTienThuaMacDinh', v as XuLyTienThua)}
+        >
+          <SelectTrigger className="w-full md:w-96">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="truKySau">Trừ vào kỳ sau</SelectItem>
+            <SelectItem value="khongTru">Không trừ (bỏ qua tiền thừa)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-gray-600">
+          Lựa chọn mặc định khi khách đóng nhiều hơn số đang nợ. Mỗi lần thu tiền vẫn có thể chọn lại.
+          Khi khách đóng trước (chưa có nợ), hệ thống luôn chọn sẵn &quot;Trừ vào kỳ sau&quot;.
+        </p>
       </div>
 
       {/* Ghi chú */}

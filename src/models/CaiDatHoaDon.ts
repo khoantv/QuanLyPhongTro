@@ -13,6 +13,7 @@ export interface ICaiDatHoaDon extends Document {
   lamTronHoaDon: boolean;
   hinhThucThanhToanMacDinh: HinhThucThanhToan;
   ghiChuMacDinh: string;
+  xuLyTienThuaMacDinh: 'truKySau' | 'khongTru';
   ngayTao: Date;
   ngayCapNhat: Date;
 }
@@ -51,6 +52,11 @@ const CaiDatHoaDonSchema = new Schema<ICaiDatHoaDon>({
     maxlength: [500, 'Ghi chú không được quá 500 ký tự'],
     default: '',
     trim: true,
+  },
+  xuLyTienThuaMacDinh: {
+    type: String,
+    enum: ['truKySau', 'khongTru'],
+    default: 'truKySau',
   },
 }, {
   timestamps: { createdAt: 'ngayTao', updatedAt: 'ngayCapNhat' },

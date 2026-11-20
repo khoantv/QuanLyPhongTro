@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCache } from '@/hooks/use-cache';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +38,8 @@ import {
   Info,
   CreditCard,
   RefreshCw,
-  Copy
+  Copy,
+  Wallet,
 } from 'lucide-react';
 import { KhachThue } from '@/types';
 import { KhachThueDataTable } from './table';
@@ -46,6 +47,8 @@ import { CCCDUpload } from '@/components/ui/cccd-upload';
 import { DeleteConfirmPopover } from '@/components/ui/delete-confirm-popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { CongNoDialog } from '@/components/cong-no/cong-no-dialog';
+import { SoDuBadge } from '@/components/cong-no/so-du';
 
 export default function KhachThuePage() {
   const cache = useCache<{ khachThueList: KhachThue[] }>({ key: 'khach-thue-data', duration: 300000 });
@@ -57,6 +60,23 @@ export default function KhachThuePage() {
   const [editingKhachThue, setEditingKhachThue] = useState<KhachThue | null>(null);
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [congNo, setCongNo] = useState<Record<string, number> | undefined>(undefined);
+  const [congNoFilter, setCongNoFilter] = useState('all');
+  const [congNoKhach, setCongNoKhach] = useState<{ khach: KhachThue; cheDo: 'xem' | 'thuTien' } | null>(null);
+
+  const fetchCongNo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/cong-no/tong-hop');
+      const r = await res.json();
+      if (r.success) setCongNo(r.data);
+    } catch (error) {
+      console.error('Error fetching cong no:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCongNo();
+  }, [fetchCongNo]);
 
   useEffect(() => {
     document.title = 'Quản lý Khách thuê';
@@ -118,12 +138,17 @@ export default function KhachThuePage() {
     }
   }, [selectedTrangThai]);
 
-  const filteredKhachThue = khachThueList.filter(khachThue =>
-    khachThue.hoTen.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    khachThue.soDienThoai.includes(searchTerm) ||
-    khachThue.cccd.includes(searchTerm) ||
-    khachThue.queQuan.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredKhachThue = khachThueList.filter(khachThue => {
+    const matchesSearch = khachThue.hoTen.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      khachThue.soDienThoai.includes(searchTerm) ||
+      khachThue.cccd.includes(searchTerm) ||
+      khachThue.queQuan.toLowerCase().includes(searchTerm.toLowerCase());
+    const soDu = congNo?.[khachThue._id!] ?? 0;
+    const matchesCongNo = congNoFilter === 'all' ||
+      (congNoFilter === 'dangNo' && soDu > 0) ||
+      (congNoFilter === 'tienThua' && soDu < 0);
+    return matchesSearch && matchesCongNo;
+  });
 
   const handleEdit = (khachThue: KhachThue) => {
     setEditingKhachThue(khachThue);
@@ -302,6 +327,11 @@ export default function KhachThuePage() {
             data={filteredKhachThue}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            congNo={congNo}
+            onCongNo={(kt) => setCongNoKhach({ khach: kt, cheDo: 'xem' })}
+            onThuTien={(kt) => setCongNoKhach({ khach: kt, cheDo: 'thuTien' })}
+            congNoFilter={congNoFilter}
+            onCongNoFilterChange={setCongNoFilter}
             actionLoading={actionLoading}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
@@ -420,9 +450,25 @@ export default function KhachThuePage() {
                   </div>
                 )}
 
+                {/* Công nợ */}
+                <div className="flex items-center justify-between border-t pt-2 text-sm">
+                  <span className="text-gray-500">Công nợ</span>
+                  <button type="button" onClick={() => setCongNoKhach({ khach: khachThue, cheDo: 'xem' })}>
+                    <SoDuBadge soDu={congNo ? (congNo[khachThue._id!] ?? 0) : null} />
+                  </button>
+                </div>
+
                 {/* Action buttons */}
                 <div className="flex justify-between items-center pt-2 border-t">
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCongNoKhach({ khach: khachThue, cheDo: 'thuTien' })}
+                      title="Thu tiền"
+                    >
+                      <Wallet className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -467,6 +513,17 @@ export default function KhachThuePage() {
           </div>
         )}
       </div>
+      <CongNoDialog
+        khachThueId={congNoKhach?.khach._id ?? null}
+        hoTen={congNoKhach?.khach.hoTen}
+        open={Boolean(congNoKhach)}
+        cheDoBanDau={congNoKhach?.cheDo ?? 'xem'}
+        onOpenChange={(o) => { if (!o) setCongNoKhach(null); }}
+        onChanged={(soDu) => {
+          const id = congNoKhach?.khach._id;
+          if (id) setCongNo((prev) => ({ ...(prev ?? {}), [id]: soDu }));
+        }}
+      />
     </div>
   );
 }

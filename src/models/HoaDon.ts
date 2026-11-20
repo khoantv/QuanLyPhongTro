@@ -23,6 +23,10 @@ export interface IHoaDon extends Document {
   tongTien: number;
   daThanhToan: number;
   conLai: number;
+  /** Số dư công nợ của khách ngay trước khi ghi hóa đơn này (dương = nợ, âm = tiền thừa). */
+  noKyTruoc: number;
+  /** tongTien + noKyTruoc */
+  tongCanThanhToan: number;
   trangThai: 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan';
   hanThanhToan: Date;
   ghiChu?: string;
@@ -139,6 +143,16 @@ const HoaDonSchema = new Schema<IHoaDon>({
     required: [true, 'Còn lại là bắt buộc'],
     min: [0, 'Còn lại phải lớn hơn hoặc bằng 0']
   },
+  noKyTruoc: {
+    type: Number,
+    default: 0
+  },
+  tongCanThanhToan: {
+    type: Number,
+    default: function(this: { tongTien?: number; noKyTruoc?: number }) {
+      return (this.tongTien || 0) + (this.noKyTruoc || 0);
+    }
+  },
   trangThai: {
     type: String,
     enum: ['chuaThanhToan', 'daThanhToanMotPhan', 'daThanhToan', 'quaHan'],
@@ -176,7 +190,10 @@ HoaDonSchema.pre('save', function(next) {
   if (this.soDien < 0) this.soDien = 0;
   if (this.soNuoc < 0) this.soNuoc = 0;
   
-  this.conLai = this.tongTien - this.daThanhToan;
+  // daThanhToan/conLai/trangThai là giá trị suy ra từ sổ công nợ (src/lib/cong-no).
+  // Ở đây chỉ giữ chúng nhất quán với tongTien cho tới lần recompute kế tiếp.
+  this.tongCanThanhToan = this.tongTien + (this.noKyTruoc || 0);
+  this.conLai = Math.max(0, this.tongTien - this.daThanhToan);
   
   if (this.conLai <= 0) {
     this.trangThai = 'daThanhToan';

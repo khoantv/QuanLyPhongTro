@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import ThanhToan from '@/models/ThanhToan';
-import HoaDon from '@/models/HoaDon';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { capNhatThanhToan, huyThanhToan } from '@/lib/cong-no';
+import { resolveThanhToanInput, ThanhToanInputError } from '@/lib/cong-no/thanh-toan-input';
 
-// PUT - Cập nhật thanh toán
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+type Params = { params: Promise<{ id: string }> };
+
+// PUT - Cập nhật thanh toán (số dư công nợ và trạng thái hóa đơn được tính lại)
+export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -18,126 +18,68 @@ export async function PUT(
 
     await connectToDatabase();
 
-    const { id } = params;
+    const { id } = await params;
+    const thanhToan = await ThanhToan.findById(id);
+    if (!thanhToan) {
+      return NextResponse.json({ message: 'Thanh toán không tồn tại' }, { status: 404 });
+    }
+
     const body = await request.json();
-    const {
-      hoaDonId,
-      soTien,
-      phuongThuc,
-      thongTinChuyenKhoan,
-      ngayThanhToan,
-      ghiChu,
-      anhBienLai
-    } = body;
-
-    // Validate required fields
-    if (!hoaDonId || !soTien || !phuongThuc) {
-      return NextResponse.json(
-        { message: 'Thiếu thông tin bắt buộc' },
-        { status: 400 }
-      );
+    // Giữ khách thuê cũ nếu client không gửi lại
+    if (!body.khachThueId && !body.hoaDonId && thanhToan.khachThue) {
+      body.khachThueId = String(thanhToan.khachThue);
     }
 
-    // Tìm thanh toán hiện tại
-    const thanhToanHienTai = await ThanhToan.findById(id);
-    if (!thanhToanHienTai) {
-      return NextResponse.json(
-        { message: 'Thanh toán không tồn tại' },
-        { status: 404 }
-      );
-    }
-
-    // Kiểm tra hóa đơn tồn tại
-    const hoaDon = await HoaDon.findById(hoaDonId);
-    if (!hoaDon) {
-      return NextResponse.json(
-        { message: 'Hóa đơn không tồn tại' },
-        { status: 404 }
-      );
-    }
-
-    // Tính toán lại số tiền còn lại của hóa đơn
-    // Trước tiên, hoàn lại số tiền cũ
-    const hoaDonCu = await HoaDon.findById(thanhToanHienTai.hoaDon);
-    if (hoaDonCu) {
-      hoaDonCu.daThanhToan -= thanhToanHienTai.soTien;
-      hoaDonCu.conLai = hoaDonCu.tongTien - hoaDonCu.daThanhToan;
-      
-      if (hoaDonCu.conLai <= 0) {
-        hoaDonCu.trangThai = 'daThanhToan';
-      } else if (hoaDonCu.daThanhToan > 0) {
-        hoaDonCu.trangThai = 'daThanhToanMotPhan';
-      } else {
-        hoaDonCu.trangThai = 'chuaThanhToan';
+    let input;
+    try {
+      input = await resolveThanhToanInput(body);
+    } catch (e) {
+      if (e instanceof ThanhToanInputError) {
+        return NextResponse.json({ message: e.message }, { status: e.status });
       }
-      
-      await hoaDonCu.save();
+      throw e;
     }
 
-    // Kiểm tra số tiền thanh toán mới không vượt quá số tiền còn lại
-    if (soTien > hoaDon.conLai) {
-      return NextResponse.json(
-        { message: 'Số tiền thanh toán không được vượt quá số tiền còn lại' },
-        { status: 400 }
-      );
+    const khachThueCu = thanhToan.khachThue ?? input.khachThue;
+    // Không gửi xuLyTienThua thì giữ lựa chọn cũ
+    const xuLyTienThua = body.xuLyTienThua === undefined ? thanhToan.xuLyTienThua : input.xuLyTienThua;
+
+    thanhToan.set({ ...input, xuLyTienThua });
+    await thanhToan.save();
+
+    const congNo = await capNhatThanhToan(
+      { _id: thanhToan._id, khachThue: input.khachThue, hopDong: input.hopDong, soTien: input.soTien, ngayThanhToan: input.ngayThanhToan },
+      khachThueCu,
+      xuLyTienThua,
+      session.user.id,
+    );
+
+    const xuLyLuu = congNo.tienThua > 0 ? (xuLyTienThua ?? 'truKySau') : null;
+    if (thanhToan.xuLyTienThua !== xuLyLuu) {
+      thanhToan.xuLyTienThua = xuLyLuu;
+      await thanhToan.save();
     }
 
-    // Validate thông tin chuyển khoản nếu phương thức là chuyển khoản
-    if (phuongThuc === 'chuyenKhoan' && !thongTinChuyenKhoan) {
-      return NextResponse.json(
-        { message: 'Thông tin chuyển khoản là bắt buộc' },
-        { status: 400 }
-      );
-    }
-
-    // Cập nhật thanh toán
-    thanhToanHienTai.hoaDon = hoaDonId;
-    thanhToanHienTai.soTien = soTien;
-    thanhToanHienTai.phuongThuc = phuongThuc;
-    thanhToanHienTai.thongTinChuyenKhoan = phuongThuc === 'chuyenKhoan' ? thongTinChuyenKhoan : undefined;
-    thanhToanHienTai.ngayThanhToan = ngayThanhToan ? new Date(ngayThanhToan) : new Date();
-    thanhToanHienTai.ghiChu = ghiChu;
-    thanhToanHienTai.anhBienLai = anhBienLai;
-
-    await thanhToanHienTai.save();
-
-    // Cập nhật hóa đơn mới
-    hoaDon.daThanhToan += soTien;
-    hoaDon.conLai = hoaDon.tongTien - hoaDon.daThanhToan;
-    
-    if (hoaDon.conLai <= 0) {
-      hoaDon.trangThai = 'daThanhToan';
-    } else if (hoaDon.daThanhToan > 0) {
-      hoaDon.trangThai = 'daThanhToanMotPhan';
-    }
-
-    await hoaDon.save();
-
-    // Populate để trả về dữ liệu đầy đủ
-    await thanhToanHienTai.populate([
-      { path: 'hoaDon', select: 'maHoaDon thang nam tongTien' },
+    await thanhToan.populate([
+      { path: 'hoaDon', select: 'maHoaDon thang nam tongTien daThanhToan conLai trangThai' },
+      { path: 'khachThue', select: 'hoTen soDienThoai' },
       { path: 'nguoiNhan', select: 'hoTen email' }
     ]);
 
     return NextResponse.json({
       success: true,
-      data: thanhToanHienTai,
+      data: thanhToan,
+      congNo: { soDu: congNo.soDu, tienThua: congNo.tienThua },
       message: 'Cập nhật thanh toán thành công'
     });
   } catch (error) {
     console.error('Error updating thanh toan:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
 
-// DELETE - Xóa thanh toán
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// DELETE - Xóa thanh toán. Bút toán công nợ được hủy mềm để giữ lịch sử.
+export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -146,46 +88,20 @@ export async function DELETE(
 
     await connectToDatabase();
 
-    const { id } = params;
-
-    // Tìm thanh toán
+    const { id } = await params;
     const thanhToan = await ThanhToan.findById(id);
     if (!thanhToan) {
-      return NextResponse.json(
-        { message: 'Thanh toán không tồn tại' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: 'Thanh toán không tồn tại' }, { status: 404 });
     }
 
-    // Cập nhật lại hóa đơn (hoàn lại số tiền)
-    const hoaDon = await HoaDon.findById(thanhToan.hoaDon);
-    if (hoaDon) {
-      hoaDon.daThanhToan -= thanhToan.soTien;
-      hoaDon.conLai = hoaDon.tongTien - hoaDon.daThanhToan;
-      
-      if (hoaDon.conLai <= 0) {
-        hoaDon.trangThai = 'daThanhToan';
-      } else if (hoaDon.daThanhToan > 0) {
-        hoaDon.trangThai = 'daThanhToanMotPhan';
-      } else {
-        hoaDon.trangThai = 'chuaThanhToan';
-      }
-      
-      await hoaDon.save();
+    if (thanhToan.khachThue) {
+      await huyThanhToan({ _id: thanhToan._id, khachThue: thanhToan.khachThue }, session.user.id);
     }
-
-    // Xóa thanh toán
     await ThanhToan.findByIdAndDelete(id);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Xóa thanh toán thành công'
-    });
+    return NextResponse.json({ success: true, message: 'Xóa thanh toán thành công' });
   } catch (error) {
     console.error('Error deleting thanh toan:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

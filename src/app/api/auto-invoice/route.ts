@@ -6,6 +6,7 @@ import HopDong from '@/models/HopDong';
 import HoaDon from '@/models/HoaDon';
 import ChiSoDienNuoc from '@/models/ChiSoDienNuoc';
 import Phong from '@/models/Phong';
+import { ghiNhanHoaDonMoi } from '@/lib/cong-no';
 
 export async function POST(request: NextRequest) {
   try {
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
         });
 
         await newInvoice.save();
+        await ghiNhanHoaDonMoi(newInvoice, (session.user as { id?: string } | undefined)?.id);
         createdInvoices++;
 
       } catch (error) {

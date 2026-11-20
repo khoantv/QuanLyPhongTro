@@ -204,6 +204,15 @@ export default function PublicInvoicePage() {
               <span>Tổng tiền:</span>
               <span>${formatCurrency(hoaDon.tongTien)}</span>
             </div>
+            ${hoaDon.noKyTruoc ? `
+            <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
+              <span>${hoaDon.noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}:</span>
+              <span>${formatCurrency(hoaDon.noKyTruoc)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+              <span>Tổng cần thanh toán:</span>
+              <span>${formatCurrency(hoaDon.tongCanThanhToan ?? (hoaDon.tongTien + hoaDon.noKyTruoc))}</span>
+            </div>` : ''}
             <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
               <span>Đã thanh toán:</span>
               <span style="color: #10b981;">${formatCurrency(hoaDon.daThanhToan)}</span>
@@ -412,6 +421,18 @@ export default function PublicInvoicePage() {
                     <span>Tổng tiền:</span>
                     <span>{formatCurrency(hoaDon.tongTien)}</span>
                   </div>
+                  {Boolean(hoaDon.noKyTruoc) && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>{(hoaDon.noKyTruoc ?? 0) > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}:</span>
+                        <span className={(hoaDon.noKyTruoc ?? 0) > 0 ? 'text-red-600' : 'text-emerald-600'}>{formatCurrency(hoaDon.noKyTruoc ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Tổng cần thanh toán:</span>
+                        <span>{formatCurrency(hoaDon.tongCanThanhToan ?? (hoaDon.tongTien + (hoaDon.noKyTruoc ?? 0)))}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between">
                     <span>Đã thanh toán:</span>
                     <span className="text-green-600">{formatCurrency(hoaDon.daThanhToan)}</span>

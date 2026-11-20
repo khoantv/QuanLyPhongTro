@@ -1,7 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type XuLyTienThua = 'truKySau' | 'khongTru';
+
 export interface IThanhToan extends Document {
-  hoaDon: mongoose.Types.ObjectId;
+  khachThue: mongoose.Types.ObjectId;
+  hopDong?: mongoose.Types.ObjectId | null;
+  /** Gợi ý hóa đơn được trả; phân bổ thực tế theo FIFO trong sổ công nợ. */
+  hoaDon?: mongoose.Types.ObjectId | null;
+  xuLyTienThua?: XuLyTienThua | null;
   soTien: number;
   phuongThuc: 'tienMat' | 'chuyenKhoan' | 'viDienTu';
   thongTinChuyenKhoan?: {
@@ -29,10 +35,25 @@ const ThongTinChuyenKhoanSchema = new Schema({
 }, { _id: false });
 
 const ThanhToanSchema = new Schema<IThanhToan>({
+  khachThue: {
+    type: Schema.Types.ObjectId,
+    ref: 'KhachThue',
+    required: [true, 'Khách thuê là bắt buộc']
+  },
+  hopDong: {
+    type: Schema.Types.ObjectId,
+    ref: 'HopDong',
+    default: null
+  },
   hoaDon: {
     type: Schema.Types.ObjectId,
     ref: 'HoaDon',
-    required: [true, 'Hóa đơn là bắt buộc']
+    default: null
+  },
+  xuLyTienThua: {
+    type: String,
+    enum: ['truKySau', 'khongTru', null],
+    default: null
   },
   soTien: {
     type: Number,
@@ -75,6 +96,7 @@ const ThanhToanSchema = new Schema<IThanhToan>({
 
 // Index cho tìm kiếm
 ThanhToanSchema.index({ hoaDon: 1 });
+ThanhToanSchema.index({ khachThue: 1, ngayThanhToan: -1 });
 ThanhToanSchema.index({ ngayThanhToan: 1 });
 ThanhToanSchema.index({ nguoiNhan: 1 });
 ThanhToanSchema.index({ phuongThuc: 1 });

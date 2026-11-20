@@ -4,6 +4,8 @@ import ThanhToan from '@/models/ThanhToan';
 import HoaDon from '@/models/HoaDon';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { ghiNhanThanhToan } from '@/lib/cong-no';
+import { resolveThanhToanInput, ThanhToanInputError } from '@/lib/cong-no/thanh-toan-input';
 
 // GET - Lấy danh sách thanh toán
 export async function GET(request: NextRequest) {
@@ -20,15 +22,22 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const hopDongId = searchParams.get('hopDongId');
     const hoaDonId = searchParams.get('hoaDonId');
+    const khachThueId = searchParams.get('khachThueId');
 
-    const query: any = {};
+    const query: Record<string, unknown> = {};
     if (hopDongId) {
       // Tìm hóa đơn theo hợp đồng
       const hoaDons = await HoaDon.find({ hopDong: hopDongId }).select('_id');
-      query.hoaDon = { $in: hoaDons.map(hd => hd._id) };
+      query.$or = [
+        { hopDong: hopDongId },
+        { hoaDon: { $in: hoaDons.map(hd => hd._id) } },
+      ];
     }
     if (hoaDonId) {
       query.hoaDon = hoaDonId;
+    }
+    if (khachThueId) {
+      query.khachThue = khachThueId;
     }
 
     const skip = (page - 1) * limit;
@@ -42,7 +51,8 @@ export async function GET(request: NextRequest) {
           { path: 'khachThue', select: 'hoTen' }
         ]
       })
-      .populate('nguoiNhan', 'hoTen email')   
+      .populate('khachThue', 'hoTen soDienThoai')
+      .populate('nguoiNhan', 'hoTen email')
       .sort({ ngayThanhToan: -1 })
       .skip(skip)
       .limit(limit);
@@ -68,7 +78,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Tạo thanh toán mới
+// POST - Tạo thanh toán mới (theo khách thuê; cho phép đóng thiếu / đóng thừa / đóng trước)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -79,92 +89,54 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
 
     const body = await request.json();
-    const {
-      hoaDonId,
-      soTien,
-      phuongThuc,
-      thongTinChuyenKhoan,
-      ngayThanhToan,
-      ghiChu,
-      anhBienLai
-    } = body;
-
-    // Validate required fields
-    if (!hoaDonId || !soTien || !phuongThuc) {
-      return NextResponse.json(
-        { message: 'Thiếu thông tin bắt buộc' },
-        { status: 400 }
-      );
+    let input;
+    try {
+      input = await resolveThanhToanInput(body);
+    } catch (e) {
+      if (e instanceof ThanhToanInputError) {
+        return NextResponse.json({ message: e.message }, { status: e.status });
+      }
+      throw e;
     }
 
-    // Kiểm tra hóa đơn tồn tại
-    const hoaDon = await HoaDon.findById(hoaDonId);
-    if (!hoaDon) {
-      return NextResponse.json(
-        { message: 'Hóa đơn không tồn tại' },
-        { status: 404 }
-      );
-    }
-
-    // Kiểm tra số tiền thanh toán không vượt quá số tiền còn lại
-    if (soTien > hoaDon.conLai) {
-      return NextResponse.json(
-        { message: 'Số tiền thanh toán không được vượt quá số tiền còn lại' },
-        { status: 400 }
-      );
-    }
-
-    // Validate thông tin chuyển khoản nếu phương thức là chuyển khoản
-    if (phuongThuc === 'chuyenKhoan' && !thongTinChuyenKhoan) {
-      return NextResponse.json(
-        { message: 'Thông tin chuyển khoản là bắt buộc' },
-        { status: 400 }
-      );
-    }
-
-    // Tạo thanh toán mới
-    const thanhToan = new ThanhToan({
-      hoaDon: hoaDonId,
-      soTien,
-      phuongThuc,
-      thongTinChuyenKhoan: phuongThuc === 'chuyenKhoan' ? thongTinChuyenKhoan : undefined,
-      ngayThanhToan: ngayThanhToan ? new Date(ngayThanhToan) : new Date(),
+    const thanhToan = await ThanhToan.create({
+      ...input,
       nguoiNhan: session.user.id,
-      ghiChu,
-      anhBienLai
     });
 
-    await thanhToan.save();
+    const congNo = await ghiNhanThanhToan(
+      { _id: thanhToan._id, khachThue: input.khachThue, hopDong: input.hopDong, soTien: input.soTien, ngayThanhToan: input.ngayThanhToan },
+      input.xuLyTienThua,
+      session.user.id,
+      input.ghiChu ? `Thu tiền — ${input.ghiChu}` : 'Thu tiền',
+    );
 
-    // Cập nhật hóa đơn
-    hoaDon.daThanhToan += soTien;
-    hoaDon.conLai = hoaDon.tongTien - hoaDon.daThanhToan;
-    
-    if (hoaDon.conLai <= 0) {
-      hoaDon.trangThai = 'daThanhToan';
-    } else if (hoaDon.daThanhToan > 0) {
-      hoaDon.trangThai = 'daThanhToanMotPhan';
+    // Chỉ lưu lựa chọn xử lý tiền thừa khi thực sự có phần thừa
+    const xuLyTienThua = congNo.tienThua > 0 ? (input.xuLyTienThua ?? 'truKySau') : null;
+    if (thanhToan.xuLyTienThua !== xuLyTienThua) {
+      thanhToan.xuLyTienThua = xuLyTienThua;
+      await thanhToan.save();
     }
 
-    await hoaDon.save();
-
-    // Populate để trả về dữ liệu đầy đủ
     await thanhToan.populate([
-      { path: 'hoaDon', select: 'maHoaDon thang nam tongTien' },
+      { path: 'hoaDon', select: 'maHoaDon thang nam tongTien daThanhToan conLai trangThai' },
+      { path: 'khachThue', select: 'hoTen soDienThoai' },
       { path: 'nguoiNhan', select: 'hoTen email' }
     ]);
 
-    // Lấy lại hóa đơn đã cập nhật với đầy đủ thông tin
-    const updatedHoaDon = await HoaDon.findById(hoaDonId)
-      .populate('phong', 'maPhong')
-      .populate('khachThue', 'hoTen')
-      .populate('hopDong', 'maHopDong');
+    const updatedHoaDon = input.hoaDon
+      ? await HoaDon.findById(input.hoaDon)
+        .populate('phong', 'maPhong')
+        .populate('khachThue', 'hoTen')
+        .populate('hopDong', 'maHopDong')
+      : null;
 
     return NextResponse.json({
       success: true,
       data: {
         thanhToan,
-        hoaDon: updatedHoaDon
+        hoaDon: updatedHoaDon,
+        congNo: { soDu: congNo.soDu, tienThua: congNo.tienThua },
       },
       message: 'Tạo thanh toán thành công'
     });

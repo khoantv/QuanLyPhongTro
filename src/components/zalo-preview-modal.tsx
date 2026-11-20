@@ -30,6 +30,8 @@ interface HoaDonOption {
   tienDien: number;
   tienNuoc: number;
   tongTien: number;
+  noKyTruoc?: number;
+  tongCanThanhToan?: number;
   hanThanhToan: string;
   phiDichVu?: Array<{ ten: string; gia: number }>;
   khachThue?: { hoTen?: string };
@@ -117,6 +119,8 @@ export function ZaloPreviewModal({ open, onOpenChange, hoaDonId, defaultPhone = 
         tienNuoc: fmtVND(selectedHoaDon.tienNuoc),
         dichVu: fmtVND((selectedHoaDon.phiDichVu || []).reduce((s, p) => s + p.gia, 0)),
         tongTien: fmtVND(selectedHoaDon.tongTien),
+        noKyTruoc: selectedHoaDon.noKyTruoc ?? 0,
+        tongCanThanhToan: fmtVND(selectedHoaDon.tongCanThanhToan ?? selectedHoaDon.tongTien + (selectedHoaDon.noKyTruoc ?? 0)),
         hanThanhToan: fmtDate(selectedHoaDon.hanThanhToan),
       }
     : {
@@ -128,6 +132,8 @@ export function ZaloPreviewModal({ open, onOpenChange, hoaDonId, defaultPhone = 
         tienNuoc: '200.000đ',
         dichVu: '150.000đ',
         tongTien: '3.300.000đ',
+        noKyTruoc: 0,
+        tongCanThanhToan: '3.300.000đ',
         hanThanhToan: '17/11/2025',
       };
 
@@ -169,6 +175,12 @@ export function ZaloPreviewModal({ open, onOpenChange, hoaDonId, defaultPhone = 
                   <div className="flex justify-between"><span className="text-gray-500">Tiền nước</span><span>{display.tienNuoc}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">Dịch vụ khác</span><span>{display.dichVu}</span></div>
                   <div className="flex justify-between font-bold pt-1 border-t"><span>Tổng tiền</span><span>{display.tongTien}</span></div>
+                  {display.noKyTruoc !== 0 && (
+                    <>
+                      <div className="flex justify-between"><span className="text-gray-500">{display.noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}</span><span>{display.noKyTruoc > 0 ? fmtVND(display.noKyTruoc) : `-${fmtVND(-display.noKyTruoc)}`}</span></div>
+                      <div className="flex justify-between font-bold"><span>Tổng cần thanh toán</span><span>{display.tongCanThanhToan}</span></div>
+                    </>
+                  )}
                 </div>
                 <p className="text-[10px]">Hạn thanh toán hóa đơn trước ngày {display.hanThanhToan}.</p>
                 <button className="w-full bg-blue-600 text-white font-bold py-2 rounded-md text-xs">XÁC NHẬN THANH TOÁN</button>

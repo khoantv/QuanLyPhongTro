@@ -27,6 +27,9 @@ interface HoaDonForTemplate {
   chiSoNuocCuoiKy?: number;
   phiDichVu?: Array<{ ten: string; gia: number }>;
   tongTien: number;
+  /** Số dư công nợ trước hóa đơn: dương = nợ kỳ trước, âm = tiền thừa kỳ trước */
+  noKyTruoc?: number;
+  tongCanThanhToan?: number;
   hanThanhToan: Date | string;
   ghiChu?: string;
 }
@@ -111,6 +114,15 @@ export function renderInvoiceCard(
         { key: 'Tiền nước', value: `${nuocDetail} ${fmtVND(hoaDon.tienNuoc)}`.trim() },
         { key: 'Dịch vụ khác', value: fmtVND(tongDichVu) },
         { key: 'Tổng tiền', value: fmtVND(hoaDon.tongTien) },
+        ...(hoaDon.noKyTruoc
+          ? [
+            {
+              key: hoaDon.noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước',
+              value: hoaDon.noKyTruoc > 0 ? fmtVND(hoaDon.noKyTruoc) : `-${fmtVND(-hoaDon.noKyTruoc)}`,
+            },
+            { key: 'Tổng cần thanh toán', value: fmtVND(hoaDon.tongCanThanhToan ?? hoaDon.tongTien + hoaDon.noKyTruoc) },
+          ]
+          : []),
       ],
     },
     {

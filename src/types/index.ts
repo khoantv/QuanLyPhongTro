@@ -111,6 +111,9 @@ export interface KhachThue {
 
 export type HinhThucThanhToan = 'tienMat' | 'chuyenKhoan' | 'momo' | 'vnpay' | 'khac';
 
+/** Cách xử lý phần tiền khách đóng thừa: trừ vào kỳ sau hoặc bỏ qua. */
+export type XuLyTienThua = 'truKySau' | 'khongTru';
+
 export interface CaiDatHoaDon {
   _id?: string;
   singleton?: true;
@@ -123,6 +126,7 @@ export interface CaiDatHoaDon {
   lamTronHoaDon: boolean;
   hinhThucThanhToanMacDinh: HinhThucThanhToan;
   ghiChuMacDinh: string;
+  xuLyTienThuaMacDinh: XuLyTienThua;
   ngayTao?: Date;
   ngayCapNhat?: Date;
 }
@@ -253,6 +257,10 @@ export interface HoaDon {
   tongTien: number;
   daThanhToan: number;
   conLai: number;
+  /** Số dư công nợ trước hóa đơn này: dương = nợ kỳ trước, âm = tiền thừa kỳ trước. */
+  noKyTruoc?: number;
+  /** tongTien + noKyTruoc */
+  tongCanThanhToan?: number;
   trangThai: 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan';
   hanThanhToan: Date;
   ghiChu?: string;
@@ -262,7 +270,10 @@ export interface HoaDon {
 
 export interface ThanhToan {
   _id?: string;
-  hoaDon: string; // ObjectId ref HoaDon
+  khachThue: string; // ObjectId ref KhachThue
+  hopDong?: string | null; // ObjectId ref HopDong
+  hoaDon?: string | null; // ObjectId ref HoaDon — gợi ý; phân bổ thực tế theo FIFO
+  xuLyTienThua?: XuLyTienThua | null;
   soTien: number;
   phuongThuc: 'tienMat' | 'chuyenKhoan' | 'viDienTu';
   thongTinChuyenKhoan?: ThongTinChuyenKhoan;
@@ -379,4 +390,31 @@ export interface DashboardStats {
   hoaDonSapDenHan: number;
   suCoCanXuLy: number;
   hopDongSapHetHan: number;
+}
+
+export type LoaiGiaoDichCongNo =
+  | 'hoaDon'
+  | 'thanhToan'
+  | 'giamTru'
+  | 'truCoc'
+  | 'tienCoc'
+  | 'hoanTien'
+  | 'boQuaTienThua'
+  | 'dieuChinh';
+
+export interface GiaoDichCongNo {
+  _id: string;
+  khachThue: string;
+  hopDong?: string | null;
+  phong?: string | { _id: string; maPhong: string } | null;
+  loai: LoaiGiaoDichCongNo;
+  soTien: number;
+  ngayGhiNhan: string;
+  hoaDon?: string | { _id: string; maHoaDon: string; thang: number; nam: number } | null;
+  thanhToan?: string | { _id: string; phuongThuc: string; xuLyTienThua?: XuLyTienThua | null } | null;
+  moTa: string;
+  daHuy: boolean;
+  lyDoHuy?: string;
+  ngayTao: string;
+  soDuLuyKe?: number | null;
 }

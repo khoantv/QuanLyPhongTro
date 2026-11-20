@@ -64,6 +64,7 @@ export default function ChinhSuaHoaDonPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const [noKyTruoc, setNoKyTruoc] = useState(0);
   const [formData, setFormData] = useState({
     maHoaDon: '',
     hopDong: '',
@@ -143,6 +144,7 @@ export default function ChinhSuaHoaDonPage() {
                new Date(hoaDonItem.hanThanhToan as Date).toISOString().split('T')[0]) : '',
             ghiChu: hoaDonItem.ghiChu || '',
           });
+          setNoKyTruoc((hoaDonItem as { noKyTruoc?: number }).noKyTruoc ?? 0);
         } else {
           toast.error('Không tìm thấy hóa đơn');
           router.push('/dashboard/hoa-don');
@@ -476,12 +478,12 @@ export default function ChinhSuaHoaDonPage() {
                     <Input
                       id="daThanhToan"
                       type="number"
-                      min="0"
                       value={formData.daThanhToan}
-                      onChange={(e) => setFormData(prev => ({ ...prev, daThanhToan: parseInt(e.target.value) || 0 }))}
-                      required
+                      readOnly
+                      disabled
                       className="h-10 text-sm"
                     />
+                    <p className="text-xs text-muted-foreground">Tự tính từ các lần thu tiền — ghi nhận ở trang Thanh toán.</p>
                   </div>
                 </div>
               </TabsContent>
@@ -675,10 +677,17 @@ export default function ChinhSuaHoaDonPage() {
                   </div>
                 </div>
 
+                {noKyTruoc !== 0 && (
+                  <div className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
+                    <span>{noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}: <strong className={noKyTruoc > 0 ? 'text-red-600' : 'text-emerald-600'}>{noKyTruoc.toLocaleString('vi-VN')} VNĐ</strong></span>
+                    <span>Tổng cần thanh toán: <strong>{(formData.tongTien + noKyTruoc).toLocaleString('vi-VN')} VNĐ</strong></span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="trangThai" className="text-sm">Trạng thái</Label>
-                    <Select value={formData.trangThai} onValueChange={(value) => setFormData(prev => ({ ...prev, trangThai: value as 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan' }))}>
+                    <Select value={formData.trangThai} disabled onValueChange={(value) => setFormData(prev => ({ ...prev, trangThai: value as 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan' }))}>
                       <SelectTrigger className="h-10">
                         <SelectValue placeholder="Chọn trạng thái" />
                       </SelectTrigger>
