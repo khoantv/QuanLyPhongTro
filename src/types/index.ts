@@ -18,9 +18,28 @@ export interface ThongTinChuyenKhoan {
   soGiaoDich: string;
 }
 
+export type LoaiPhiHoaDon = 'dichVu' | 'tienPhongLe' | 'khac';
+
+export interface ChiTietTienPhongLe {
+  tuNgay: string | Date;
+  denNgay: string | Date;
+  soNgay: number;
+  soNgayCuaKy: number;
+  giaThue: number;
+  soTienTuTinh: number;
+}
+
 export interface PhiDichVu {
   ten: string;
   gia: number;
+  /** Chỉ có trên hóa đơn: dichVu (phí hợp đồng), tienPhongLe, khac (khoản phát sinh) */
+  loai?: LoaiPhiHoaDon;
+  chiTiet?: ChiTietTienPhongLe | null;
+}
+
+export interface KhoanGiamTru {
+  ten: string;
+  soTien: number;
 }
 
 export interface NguoiDung {
@@ -127,6 +146,7 @@ export interface CaiDatHoaDon {
   hinhThucThanhToanMacDinh: HinhThucThanhToan;
   ghiChuMacDinh: string;
   xuLyTienThuaMacDinh: XuLyTienThua;
+  hoanTienPhongKhiTraPhong?: boolean;
   ngayTao?: Date;
   ngayCapNhat?: Date;
 }
@@ -212,7 +232,12 @@ export interface HopDong {
   chiSoDienBanDau: number;
   chiSoNuocBanDau: number;
   phiDichVu: PhiDichVu[];
-  trangThai: 'hoatDong' | 'hetHan' | 'daHuy';
+  trangThai: 'hoatDong' | 'hetHan' | 'daHuy' | 'daThanhLy';
+  daThuTienPhongDen?: string | Date | null;
+  hopDongTruoc?: string | null;
+  hopDongSau?: string | null;
+  lyDoKetThuc?: 'hetHan' | 'traPhong' | 'chuyenPhong' | 'huy' | null;
+  ngayTraPhong?: string | Date | null;
   fileHopDong?: string;
   ngayTao: Date;
   ngayCapNhat: Date;
@@ -261,6 +286,12 @@ export interface HoaDon {
   noKyTruoc?: number;
   /** tongTien + noKyTruoc */
   tongCanThanhToan?: number;
+  khoanGiamTru?: KhoanGiamTru[];
+  loaiHoaDon?: 'hangThang' | 'chotPhong';
+  kyBatDau?: string | Date | null;
+  kyKetThuc?: string | Date | null;
+  tienLamTron?: number;
+  hinhThucThanhToan?: HinhThucThanhToan | null;
   trangThai: 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan';
   hanThanhToan: Date;
   ghiChu?: string;

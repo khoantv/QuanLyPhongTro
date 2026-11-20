@@ -19,7 +19,18 @@ export interface IHoaDon extends Document {
   phiDichVu: Array<{
     ten: string;
     gia: number;
+    loai?: LoaiPhiHoaDon;
+    chiTiet?: ChiTietTienPhongLe | null;
   }>;
+  khoanGiamTru: Array<{ ten: string; soTien: number }>;
+  loaiHoaDon: 'hangThang' | 'chotPhong';
+  /** Kỳ tiền phòng mà hóa đơn thu: [kyBatDau, kyKetThuc) */
+  kyBatDau?: Date | null;
+  kyKetThuc?: Date | null;
+  /** Giá trị HopDong.daThuTienPhongDen trước khi lập hóa đơn này (để khôi phục khi xóa). */
+  mocTienPhongTruoc?: Date | null;
+  tienLamTron: number;
+  hinhThucThanhToan?: string | null;
   tongTien: number;
   daThanhToan: number;
   conLai: number;
@@ -34,6 +45,31 @@ export interface IHoaDon extends Document {
   ngayCapNhat: Date;
 }
 
+export type LoaiPhiHoaDon = 'dichVu' | 'tienPhongLe' | 'khac';
+
+export interface ChiTietTienPhongLe {
+  tuNgay: Date;
+  denNgay: Date;
+  soNgay: number;
+  soNgayCuaKy: number;
+  giaThue: number;
+  soTienTuTinh: number;
+}
+
+const ChiTietTienPhongLeSchema = new Schema({
+  tuNgay: Date,
+  denNgay: Date,
+  soNgay: Number,
+  soNgayCuaKy: Number,
+  giaThue: Number,
+  soTienTuTinh: Number,
+}, { _id: false });
+
+const KhoanGiamTruSchema = new Schema({
+  ten: { type: String, required: [true, 'Tên khoản giảm trừ là bắt buộc'], trim: true },
+  soTien: { type: Number, required: true, min: [0, 'Số tiền giảm trừ phải ≥ 0'] },
+}, { _id: false });
+
 const PhiDichVuSchema = new Schema({
   ten: {
     type: String,
@@ -44,7 +80,13 @@ const PhiDichVuSchema = new Schema({
     type: Number,
     required: [true, 'Giá dịch vụ là bắt buộc'],
     min: [0, 'Giá dịch vụ phải lớn hơn hoặc bằng 0']
-  }
+  },
+  loai: {
+    type: String,
+    enum: ['dichVu', 'tienPhongLe', 'khac'],
+    default: 'dichVu'
+  },
+  chiTiet: { type: ChiTietTienPhongLeSchema, default: null }
 }, { _id: false });
 
 const HoaDonSchema = new Schema<IHoaDon>({
@@ -127,10 +169,27 @@ const HoaDonSchema = new Schema<IHoaDon>({
     min: [0, 'Chỉ số nước cuối kỳ phải lớn hơn hoặc bằng 0']
   },
   phiDichVu: [PhiDichVuSchema],
+  khoanGiamTru: { type: [KhoanGiamTruSchema], default: [] },
+  loaiHoaDon: {
+    type: String,
+    enum: ['hangThang', 'chotPhong'],
+    default: 'hangThang'
+  },
+  kyBatDau: { type: Date, default: null },
+  kyKetThuc: { type: Date, default: null },
+  mocTienPhongTruoc: { type: Date, default: null },
+  tienLamTron: { type: Number, default: 0 },
+  hinhThucThanhToan: { type: String, default: null },
   tongTien: {
     type: Number,
     required: [true, 'Tổng tiền là bắt buộc'],
-    min: [0, 'Tổng tiền phải lớn hơn hoặc bằng 0']
+    validate: {
+      // Chỉ hóa đơn chốt phòng được phép âm (hoàn tiền phòng nhiều hơn điện nước)
+      validator: function(this: { loaiHoaDon?: string }, v: number) {
+        return v >= 0 || this.loaiHoaDon === 'chotPhong';
+      },
+      message: 'Tổng tiền phải lớn hơn hoặc bằng 0'
+    }
   },
   daThanhToan: {
     type: Number,
@@ -179,17 +238,19 @@ HoaDonSchema.index({ khachThue: 1 });
 HoaDonSchema.index({ thang: 1, nam: 1 });
 HoaDonSchema.index({ trangThai: 1 });
 HoaDonSchema.index({ hanThanhToan: 1 });
+// Mỗi hợp đồng tối đa một hóa đơn hàng tháng cho mỗi kỳ
+HoaDonSchema.index(
+  { hopDong: 1, kyBatDau: 1 },
+  { unique: true, partialFilterExpression: { loaiHoaDon: 'hangThang', kyBatDau: { $type: 'date' } } }
+);
 
 // Pre-save middleware để tính conLai, cập nhật trangThai và tính số điện nước
 HoaDonSchema.pre('save', function(next) {
-  // Tính số điện nước từ chỉ số
-  this.soDien = this.chiSoDienCuoiKy - this.chiSoDienBanDau;
-  this.soNuoc = this.chiSoNuocCuoiKy - this.chiSoNuocBanDau;
-  
-  // Đảm bảo số điện nước không âm
+  // soDien / soNuoc do src/lib/hoa-don/lap-hoa-don tính (có trường hợp thay đồng hồ),
+  // ở đây chỉ chặn giá trị âm.
   if (this.soDien < 0) this.soDien = 0;
   if (this.soNuoc < 0) this.soNuoc = 0;
-  
+
   // daThanhToan/conLai/trangThai là giá trị suy ra từ sổ công nợ (src/lib/cong-no).
   // Ở đây chỉ giữ chúng nhất quán với tongTien cho tới lần recompute kế tiếp.
   this.tongCanThanhToan = this.tongTien + (this.noKyTruoc || 0);

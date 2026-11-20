@@ -195,6 +195,10 @@ export default function PublicInvoicePage() {
               ${hoaDon.phiDichVu.map(phi => `
                 <div style="display: flex; justify-content: space-between;"><span>${phi.ten}</span><span>${formatCurrency(phi.gia)}</span></div>
               `).join('')}
+              ${(hoaDon.khoanGiamTru || []).map(g => `
+                <div style="display: flex; justify-content: space-between;"><span>${g.ten}</span><span>-${formatCurrency(g.soTien)}</span></div>
+              `).join('')}
+              ${hoaDon.tienLamTron ? `<div style="display: flex; justify-content: space-between;"><span>Làm tròn</span><span>${formatCurrency(hoaDon.tienLamTron)}</span></div>` : ''}
             </div>
           </div>
 
@@ -412,6 +416,18 @@ export default function PublicInvoicePage() {
                         <span>{formatCurrency(phi.gia)}</span>
                       </div>
                     ))}
+                    {(hoaDon.khoanGiamTru || []).map((g, index) => (
+                      <div key={`gt-${index}`} className="flex justify-between text-emerald-700">
+                        <span>{g.ten}</span>
+                        <span>−{formatCurrency(g.soTien)}</span>
+                      </div>
+                    ))}
+                    {Boolean(hoaDon.tienLamTron) && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Làm tròn</span>
+                        <span>{formatCurrency(hoaDon.tienLamTron ?? 0)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

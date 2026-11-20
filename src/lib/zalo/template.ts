@@ -25,7 +25,8 @@ interface HoaDonForTemplate {
   soNuoc?: number;
   chiSoNuocBanDau?: number;
   chiSoNuocCuoiKy?: number;
-  phiDichVu?: Array<{ ten: string; gia: number }>;
+  phiDichVu?: Array<{ ten: string; gia: number; loai?: string }>;
+  khoanGiamTru?: Array<{ ten: string; soTien: number }>;
   tongTien: number;
   /** Số dư công nợ trước hóa đơn: dương = nợ kỳ trước, âm = tiền thừa kỳ trước */
   noKyTruoc?: number;
@@ -95,7 +96,9 @@ export function renderInvoiceCard(
     ? `${hoaDon.chiSoNuocBanDau}-${hoaDon.chiSoNuocCuoiKy}` + (hoaDon.soNuoc != null ? ` ${hoaDon.soNuoc}x` : '')
     : '';
 
-  const tongDichVu = (hoaDon.phiDichVu || []).reduce((s, p) => s + (p.gia || 0), 0);
+  const tienPhongLe = (hoaDon.phiDichVu || []).filter((p) => p.loai === 'tienPhongLe');
+  const tongDichVu = (hoaDon.phiDichVu || []).filter((p) => p.loai !== 'tienPhongLe').reduce((s, p) => s + (p.gia || 0), 0);
+  const tongGiamTru = (hoaDon.khoanGiamTru || []).reduce((s, g) => s + (g.soTien || 0), 0);
   const ghiChu = (hoaDon.ghiChu?.trim() || settings.ghiChuMacDinh?.trim() || '').slice(0, 500);
 
   const elements: Array<Record<string, unknown>> = [
@@ -110,9 +113,12 @@ export function renderInvoiceCard(
         { key: 'Mã hóa đơn', value: `#${hoaDon.maHoaDon}` },
         { key: 'Mã thanh toán', value: `RT${hoaDon.maHoaDon}` },
         { key: 'Tiền phòng', value: fmtVND(hoaDon.tienPhong) },
+        // Khóa bảng Zalo nên ngắn — đưa khoảng ngày sang phần giá trị
+        ...tienPhongLe.map((p) => ({ key: 'Tiền phòng lẻ', value: `${p.ten.replace(/^Tiền phòng lẻ\s*/, '')} ${fmtVND(p.gia)}`.trim() })),
         { key: 'Tiền điện', value: `${dienDetail} ${fmtVND(hoaDon.tienDien)}`.trim() },
         { key: 'Tiền nước', value: `${nuocDetail} ${fmtVND(hoaDon.tienNuoc)}`.trim() },
         { key: 'Dịch vụ khác', value: fmtVND(tongDichVu) },
+        ...(tongGiamTru ? [{ key: 'Giảm trừ', value: `-${fmtVND(tongGiamTru)}` }] : []),
         { key: 'Tổng tiền', value: fmtVND(hoaDon.tongTien) },
         ...(hoaDon.noKyTruoc
           ? [

@@ -350,6 +350,10 @@ export default function HoaDonPage() {
               <span>${formatCurrency(phi.gia)}</span>
             </div>
           `).join('')}
+              ${(hoaDon.khoanGiamTru || []).map(g => `
+                <div class="item"><span>${g.ten}</span><span>-${formatCurrency(g.soTien)}</span></div>
+              `).join('')}
+              ${hoaDon.tienLamTron ? `<div class="item"><span>Làm tròn</span><span>${formatCurrency(hoaDon.tienLamTron)}</span></div>` : ''}
         </div>
         
         <div class="total">
@@ -479,6 +483,10 @@ export default function HoaDonPage() {
               ${hoaDon.phiDichVu.map(phi => `
                 <div style="display: flex; justify-content: space-between;"><span>${phi.ten}</span><span>${formatCurrency(phi.gia)}</span></div>
               `).join('')}
+              ${(hoaDon.khoanGiamTru || []).map(g => `
+                <div style="display: flex; justify-content: space-between;"><span>${g.ten}</span><span>-${formatCurrency(g.soTien)}</span></div>
+              `).join('')}
+              ${hoaDon.tienLamTron ? `<div style="display: flex; justify-content: space-between;"><span>Làm tròn</span><span>${formatCurrency(hoaDon.tienLamTron)}</span></div>` : ''}
             </div>
           </div>
 
@@ -988,6 +996,18 @@ export default function HoaDonPage() {
                       <span>{formatCurrency(phi.gia)}</span>
                     </div>
                   ))}
+                  {(viewingHoaDon.khoanGiamTru || []).map((g, index) => (
+                    <div key={`gt-${index}`} className="flex justify-between text-emerald-700">
+                      <span>{g.ten}</span>
+                      <span>−{formatCurrency(g.soTien)}</span>
+                    </div>
+                  ))}
+                  {Boolean(viewingHoaDon.tienLamTron) && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Làm tròn</span>
+                      <span>{formatCurrency(viewingHoaDon.tienLamTron ?? 0)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

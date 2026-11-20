@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 import GiaoDichCongNo, { IGiaoDichCongNo, LoaiGiaoDichCongNo } from '@/models/GiaoDichCongNo';
 import HoaDon from '@/models/HoaDon';
 import HopDong from '@/models/HopDong';
+// Đăng ký các model được populate — tránh MissingSchemaError khi server vừa khởi động (cold start)
+import '@/models/Phong';
+import '@/models/KhachThue';
+import '@/models/ThanhToan';
+import '@/models/NguoiDung';
 import { phanBoFIFO, tinhTienThua, tinhTrangThaiHoaDon } from './phan-bo';
 
 export * from './phan-bo';

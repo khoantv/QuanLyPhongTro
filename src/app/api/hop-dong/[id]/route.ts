@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { dauNgayVN } from '@/lib/ky-thu';
+import HoaDon from '@/models/HoaDon';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
@@ -146,7 +148,10 @@ export async function PUT(
     
     // Xử lý ngày tháng
     if (validatedData.ngayBatDau) {
-      updateData.ngayBatDau = new Date(validatedData.ngayBatDau);
+      updateData.ngayBatDau = dauNgayVN(validatedData.ngayBatDau);
+      // Chưa lập hóa đơn hàng tháng nào thì mốc tiền phòng đi theo ngày bắt đầu mới
+      const daCoHoaDon = await HoaDon.exists({ hopDong: id, loaiHoaDon: { $ne: 'chotPhong' } });
+      if (!daCoHoaDon) updateData.daThuTienPhongDen = updateData.ngayBatDau;
     }
     if (validatedData.ngayKetThuc) {
       updateData.ngayKetThuc = new Date(validatedData.ngayKetThuc);

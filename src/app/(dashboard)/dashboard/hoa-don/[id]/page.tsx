@@ -24,7 +24,8 @@ import {
   Wrench,
   Calculator
 } from 'lucide-react';
-import { HoaDon, HopDong, Phong, KhachThue } from '@/types';
+import { HoaDon, HopDong, Phong, KhachThue, PhiDichVu, KhoanGiamTru } from '@/types';
+import { PhiDichVuEditor, GiamTruEditor, lamTron1000 } from '@/components/hoa-don/khoan-thu-editor';
 import { toast } from 'sonner';
 
 // Helper functions
@@ -81,7 +82,8 @@ export default function ChinhSuaHoaDonPage() {
     soNuoc: 0,
     chiSoNuocBanDau: 0,
     chiSoNuocCuoiKy: 0,
-    phiDichVu: [] as Array<{ten: string, gia: number}>,
+    phiDichVu: [] as PhiDichVu[],
+    khoanGiamTru: [] as KhoanGiamTru[],
     tongTien: 0,
     daThanhToan: 0,
     conLai: 0,
@@ -90,7 +92,11 @@ export default function ChinhSuaHoaDonPage() {
     ghiChu: '',
   });
 
-  const [newPhiDichVu, setNewPhiDichVu] = useState({ ten: '', gia: 0 });
+  const [lamTron, setLamTron] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/cai-dat-hoa-don').then(r => r.json()).then(r => { if (r.success) setLamTron(Boolean(r.data.lamTronHoaDon)); }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (hoaDonId) {
@@ -135,6 +141,7 @@ export default function ChinhSuaHoaDonPage() {
             chiSoNuocBanDau: hoaDonItem.chiSoNuocBanDau ?? 0,
             chiSoNuocCuoiKy: hoaDonItem.chiSoNuocCuoiKy ?? 0,
             phiDichVu: hoaDonItem.phiDichVu || [],
+            khoanGiamTru: hoaDonItem.khoanGiamTru || [],
             tongTien: hoaDonItem.tongTien || 0,
             daThanhToan: hoaDonItem.daThanhToan || 0,
             conLai: hoaDonItem.conLai || 0,
@@ -190,8 +197,10 @@ export default function ChinhSuaHoaDonPage() {
     const tienDienTinh = soDien * giaDien;
     const tienNuocTinh = soNuoc * giaNuoc;
     
-    const total = formData.tienPhong + tienDienTinh + tienNuocTinh + totalPhiDichVu;
-    const conLai = total - formData.daThanhToan;
+    const totalGiamTru = formData.khoanGiamTru.reduce((sum: number, g) => sum + (g.soTien || 0), 0);
+    const truocLamTron = formData.tienPhong + tienDienTinh + tienNuocTinh + totalPhiDichVu - totalGiamTru;
+    const total = lamTron ? lamTron1000(truocLamTron) : truocLamTron;
+    const conLai = Math.max(0, total - formData.daThanhToan);
     
     setFormData(prev => ({
       ...prev,
@@ -206,7 +215,7 @@ export default function ChinhSuaHoaDonPage() {
 
   useEffect(() => {
     calculateTotal();
-  }, [formData.tienPhong, formData.chiSoDienBanDau, formData.chiSoDienCuoiKy, formData.chiSoNuocBanDau, formData.chiSoNuocCuoiKy, formData.phiDichVu, formData.daThanhToan, formData.hopDong, hopDongList]);
+  }, [formData.tienPhong, formData.chiSoDienBanDau, formData.chiSoDienCuoiKy, formData.chiSoNuocBanDau, formData.chiSoNuocCuoiKy, formData.phiDichVu, formData.khoanGiamTru, formData.daThanhToan, formData.hopDong, hopDongList, lamTron]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,23 +254,6 @@ export default function ChinhSuaHoaDonPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const addPhiDichVu = () => {
-    if (newPhiDichVu.ten && newPhiDichVu.gia > 0) {
-      setFormData(prev => ({
-        ...prev,
-        phiDichVu: [...prev.phiDichVu, { ...newPhiDichVu }]
-      }));
-      setNewPhiDichVu({ ten: '', gia: 0 });
-    }
-  };
-
-  const removePhiDichVu = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      phiDichVu: prev.phiDichVu.filter((_, i) => i !== index)
-    }));
   };
 
   if (loading) {
@@ -352,6 +344,13 @@ export default function ChinhSuaHoaDonPage() {
               </TabsList>
 
               <TabsContent value="thong-tin" className="space-y-3 md:space-y-4 mt-4 md:mt-6">
+                {hoaDon.kyBatDau && hoaDon.kyKetThuc && (
+                  <div className="rounded-md border bg-blue-50 p-3 text-sm">
+                    📅 Kỳ thu: <strong>{new Date(hoaDon.kyBatDau).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</strong> – <strong>{new Date(new Date(hoaDon.kyKetThuc).getTime() - 86400000).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</strong>
+                    {hoaDon.loaiHoaDon === 'chotPhong' ? ' · Hóa đơn chốt phòng' : ''}
+                    <span className="block text-xs text-muted-foreground">Hợp đồng, tháng và kỳ thu không đổi được sau khi lập — muốn đổi hãy xóa hóa đơn (nếu là hóa đơn mới nhất) rồi lập lại.</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="maHoaDon" className="text-xs md:text-sm">Mã hóa đơn</Label>
@@ -370,7 +369,7 @@ export default function ChinhSuaHoaDonPage() {
                     <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mb-1">
                       {hopDongList.filter(hd => hd.trangThai === 'hoatDong').length} hợp đồng hoạt động
                     </div>
-                    <Select value={formData.hopDong} onValueChange={(value) => setFormData(prev => ({ ...prev, hopDong: value }))}>
+                    <Select value={formData.hopDong} disabled onValueChange={(value) => setFormData(prev => ({ ...prev, hopDong: value }))}>
                       <SelectTrigger className="h-10">
                         <SelectValue placeholder="Chọn hợp đồng" />
                       </SelectTrigger>
@@ -428,6 +427,7 @@ export default function ChinhSuaHoaDonPage() {
                       max="12"
                       value={formData.thang}
                       onChange={(e) => setFormData(prev => ({ ...prev, thang: parseInt(e.target.value) || 1 }))}
+                      disabled
                       required
                       className="h-10 text-sm"
                     />
@@ -441,6 +441,7 @@ export default function ChinhSuaHoaDonPage() {
                       min="2020"
                       value={formData.nam}
                       onChange={(e) => setFormData(prev => ({ ...prev, nam: parseInt(e.target.value) || new Date().getFullYear() }))}
+                      disabled
                       required
                       className="h-10 text-sm"
                     />
@@ -604,57 +605,20 @@ export default function ChinhSuaHoaDonPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="dich-vu" className="space-y-4 mt-6">
-                <h3 className="text-base font-semibold">🔧 Phí dịch vụ</h3>
-                
-                {formData.phiDichVu.length > 0 && (
-                  <div className="space-y-2">
-                    {formData.phiDichVu.map((phi, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                        <span className="text-sm font-medium">{phi.ten}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-blue-600 font-medium">{phi.gia.toLocaleString('vi-VN')} VNĐ</span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removePhiDichVu(index)}
-                            className="h-7 px-2 text-xs"
-                          >
-                            ✕
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
+              <TabsContent value="dich-vu" className="space-y-6 mt-6">
                 <div className="space-y-2">
-                  <Label className="text-sm">Thêm phí dịch vụ</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Tên dịch vụ"
-                      value={newPhiDichVu.ten}
-                      onChange={(e) => setNewPhiDichVu(prev => ({ ...prev, ten: e.target.value }))}
-                      className="flex-1 h-9"
-                    />
-                    <Input
-                      placeholder="Giá"
-                      type="number"
-                      min="0"
-                      value={newPhiDichVu.gia}
-                      onChange={(e) => setNewPhiDichVu(prev => ({ ...prev, gia: parseInt(e.target.value) || 0 }))}
-                      className="w-24 h-9"
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={addPhiDichVu}
-                      disabled={!newPhiDichVu.ten || newPhiDichVu.gia <= 0}
-                      className="h-9 px-3 text-sm"
-                    >
-                      +
-                    </Button>
-                  </div>
+                  <h3 className="text-base font-semibold">🔧 Phí dịch vụ & khoản thu khác</h3>
+                  <PhiDichVuEditor
+                    value={formData.phiDichVu}
+                    onChange={(phiDichVu) => setFormData(prev => ({ ...prev, phiDichVu }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold">➖ Giảm trừ</h3>
+                  <GiamTruEditor
+                    value={formData.khoanGiamTru}
+                    onChange={(khoanGiamTru) => setFormData(prev => ({ ...prev, khoanGiamTru }))}
+                  />
                 </div>
               </TabsContent>
 
@@ -677,6 +641,7 @@ export default function ChinhSuaHoaDonPage() {
                   </div>
                 </div>
 
+                {lamTron && <p className="text-xs text-muted-foreground">Tổng tiền đã làm tròn đến 1.000đ theo Cài đặt phiếu thu.</p>}
                 {noKyTruoc !== 0 && (
                   <div className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
                     <span>{noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}: <strong className={noKyTruoc > 0 ? 'text-red-600' : 'text-emerald-600'}>{noKyTruoc.toLocaleString('vi-VN')} VNĐ</strong></span>

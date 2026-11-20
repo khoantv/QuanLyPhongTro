@@ -20,7 +20,13 @@ export interface IHopDong extends Document {
     ten: string;
     gia: number;
   }>;
-  trangThai: 'hoatDong' | 'hetHan' | 'daHuy';
+  trangThai: 'hoatDong' | 'hetHan' | 'daHuy' | 'daThanhLy';
+  /** Tiền phòng đã được lập hóa đơn tới ngày này (không phụ thuộc đã trả hay chưa). */
+  daThuTienPhongDen?: Date | null;
+  hopDongTruoc?: mongoose.Types.ObjectId | null;
+  hopDongSau?: mongoose.Types.ObjectId | null;
+  lyDoKetThuc?: 'hetHan' | 'traPhong' | 'chuyenPhong' | 'huy' | null;
+  ngayTraPhong?: Date | null;
   fileHopDong?: string;
   ngayTao: Date;
   ngayCapNhat: Date;
@@ -119,9 +125,23 @@ const HopDongSchema = new Schema<IHopDong>({
   phiDichVu: [PhiDichVuSchema],
   trangThai: {
     type: String,
-    enum: ['hoatDong', 'hetHan', 'daHuy'],
+    enum: ['hoatDong', 'hetHan', 'daHuy', 'daThanhLy'],
     default: 'hoatDong'
   },
+  daThuTienPhongDen: {
+    type: Date,
+    default: function(this: { ngayBatDau?: Date }) {
+      return this.ngayBatDau ?? null;
+    }
+  },
+  hopDongTruoc: { type: Schema.Types.ObjectId, ref: 'HopDong', default: null },
+  hopDongSau: { type: Schema.Types.ObjectId, ref: 'HopDong', default: null },
+  lyDoKetThuc: {
+    type: String,
+    enum: ['hetHan', 'traPhong', 'chuyenPhong', 'huy', null],
+    default: null
+  },
+  ngayTraPhong: { type: Date, default: null },
   fileHopDong: {
     type: String,
     trim: true

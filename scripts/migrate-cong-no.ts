@@ -1,5 +1,7 @@
 /**
- * Migration: chuyển hóa đơn / thanh toán hiện có sang sổ công nợ (GiaoDichCongNo).
+ * Migration dữ liệu cũ:
+ *  1. Kỳ thu: gán loaiHoaDon / kyBatDau / kyKetThuc cho hóa đơn cũ, HopDong.daThuTienPhongDen cho hợp đồng.
+ *  2. Công nợ: chuyển hóa đơn / thanh toán hiện có sang sổ công nợ (GiaoDichCongNo).
  *
  *   npm run db:migrate-cong-no -- --dry-run   # chỉ báo cáo, không ghi DB
  *   npm run db:migrate-cong-no                # ghi thật
@@ -12,6 +14,8 @@ import dbConnect from '../src/lib/mongodb';
 import HoaDon from '../src/models/HoaDon';
 import ThanhToan from '../src/models/ThanhToan';
 import GiaoDichCongNo from '../src/models/GiaoDichCongNo';
+import HopDong from '../src/models/HopDong';
+import { dauNgayVN, fmtNgay, kyThuCuaThang } from '../src/lib/ky-thu';
 import '../src/models/KhachThue';
 import { phanBoFIFO, recomputeCongNo, ButToanPhanBo } from '../src/lib/cong-no';
 
@@ -32,9 +36,58 @@ interface PlannedEntry {
   moTa: string;
 }
 
+async function migrateKyThu() {
+  console.log(`== Bước 1: kỳ thu ${DRY_RUN ? '(DRY RUN)' : ''} ==`);
+  const hopDongs = await HopDong.find({})
+    .select('maHopDong ngayThanhToan ngayBatDau daThuTienPhongDen')
+    .lean<Array<{ _id: OID; maHopDong: string; ngayThanhToan: number; ngayBatDau: Date; daThuTienPhongDen?: Date | null }>>();
+  const hdById = new Map(hopDongs.map((h) => [String(h._id), h]));
+
+  const hoaDonCu = await HoaDon.find({ $or: [{ loaiHoaDon: { $exists: false } }, { loaiHoaDon: 'hangThang', kyBatDau: null }] })
+    .select('maHoaDon hopDong thang nam loaiHoaDon kyBatDau')
+    .lean<Array<{ _id: OID; maHoaDon: string; hopDong: OID; thang: number; nam: number }>>();
+
+  const opsHoaDon = [];
+  const kyKetThucMoiNhat = new Map<string, Date>();
+  for (const hd of hoaDonCu) {
+    const hopDong = hdById.get(String(hd.hopDong));
+    if (!hopDong) {
+      console.log(`  Cảnh báo: hóa đơn ${hd.maHoaDon} không có hợp đồng — chỉ gán loaiHoaDon`);
+      opsHoaDon.push({ updateOne: { filter: { _id: hd._id }, update: { $set: { loaiHoaDon: 'hangThang' } } } });
+      continue;
+    }
+    const ky = kyThuCuaThang(hopDong.ngayThanhToan, hd.thang, hd.nam);
+    opsHoaDon.push({ updateOne: { filter: { _id: hd._id }, update: { $set: { loaiHoaDon: 'hangThang', kyBatDau: ky.batDau, kyKetThuc: ky.ketThuc } } } });
+  }
+
+  // Mốc đã thu tiền phòng = kyKetThuc của hóa đơn hàng tháng mới nhất (sau khi gán ở trên)
+  const tatCa = await HoaDon.find({ loaiHoaDon: { $ne: 'chotPhong' } }).select('hopDong thang nam kyKetThuc')
+    .lean<Array<{ hopDong: OID; thang: number; nam: number; kyKetThuc?: Date | null }>>();
+  for (const hd of tatCa) {
+    const hopDong = hdById.get(String(hd.hopDong));
+    if (!hopDong) continue;
+    const ketThuc = hd.kyKetThuc ?? kyThuCuaThang(hopDong.ngayThanhToan, hd.thang, hd.nam).ketThuc;
+    const cu = kyKetThucMoiNhat.get(String(hd.hopDong));
+    if (!cu || ketThuc > cu) kyKetThucMoiNhat.set(String(hd.hopDong), ketThuc);
+  }
+  const opsHopDong = [];
+  for (const hopDong of hopDongs) {
+    if (hopDong.daThuTienPhongDen) continue;
+    const moc = kyKetThucMoiNhat.get(String(hopDong._id)) ?? dauNgayVN(hopDong.ngayBatDau);
+    opsHopDong.push({ updateOne: { filter: { _id: hopDong._id }, update: { $set: { daThuTienPhongDen: moc } } } });
+    console.log(`  ${hopDong.maHopDong}: đã thu tiền phòng đến ${fmtNgay(moc)}`);
+  }
+
+  console.log(`  Hóa đơn cần gán kỳ: ${opsHoaDon.length}; hợp đồng cần gán mốc tiền phòng: ${opsHopDong.length}`);
+  if (DRY_RUN) return;
+  if (opsHoaDon.length) await HoaDon.bulkWrite(opsHoaDon);
+  if (opsHopDong.length) await HopDong.bulkWrite(opsHopDong);
+}
+
 async function main() {
   await dbConnect();
-  console.log(`== Migration công nợ ${DRY_RUN ? '(DRY RUN — không ghi DB)' : ''} ==`);
+  await migrateKyThu();
+  console.log(`\n== Bước 2: công nợ ${DRY_RUN ? '(DRY RUN — không ghi DB)' : ''} ==`);
 
   const hoaDons = await HoaDon.find({})
     .select('maHoaDon thang nam khachThue hopDong phong tongTien daThanhToan ngayTao noKyTruoc')

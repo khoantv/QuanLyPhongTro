@@ -73,6 +73,7 @@ export default function CaiDatHoaDonPage() {
           hinhThucThanhToanMacDinh: settings.hinhThucThanhToanMacDinh,
           ghiChuMacDinh: settings.ghiChuMacDinh,
           xuLyTienThuaMacDinh: settings.xuLyTienThuaMacDinh,
+          hoanTienPhongKhiTraPhong: Boolean(settings.hoanTienPhongKhiTraPhong),
         }),
       });
       const r = await res.json();
@@ -278,6 +279,22 @@ export default function CaiDatHoaDonPage() {
           Lựa chọn mặc định khi khách đóng nhiều hơn số đang nợ. Mỗi lần thu tiền vẫn có thể chọn lại.
           Khi khách đóng trước (chưa có nợ), hệ thống luôn chọn sẵn &quot;Trừ vào kỳ sau&quot;.
         </p>
+      </div>
+
+      {/* Hoàn tiền phòng khi trả phòng */}
+      <div className="border-t pt-6 flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="hoanTienPhong">Hoàn tiền phòng chưa ở khi khách trả phòng</Label>
+          <p className="text-sm text-gray-600">
+            Tiền phòng thu trước cho kỳ tới. Bật để hoàn lại phần ngày chưa ở khi khách tự trả phòng giữa kỳ
+            (khi chuyển phòng hệ thống luôn tính lại theo ngày). Có thể đổi riêng từng lần trả phòng.
+          </p>
+        </div>
+        <Switch
+          id="hoanTienPhong"
+          checked={Boolean(settings.hoanTienPhongKhiTraPhong)}
+          onCheckedChange={(v) => update('hoanTienPhongKhiTraPhong', v)}
+        />
       </div>
 
       {/* Ghi chú */}

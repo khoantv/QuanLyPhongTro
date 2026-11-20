@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import HoaDon from '@/models/HoaDon';
-import HopDong from '@/models/HopDong';
 import '@/models/Phong';
 import '@/models/KhachThue';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { ghiNhanHoaDonMoi, capNhatButToanHoaDon, huyButToanHoaDon } from '@/lib/cong-no';
-import { PhiDichVu } from '@/types';
+import { lapHoaDonHangThang, capNhatHoaDon, xoaHoaDon, LapHoaDonError } from '@/lib/hoa-don/lap-hoa-don';
+import { guiZaloTuDong } from '@/lib/hoa-don/gui-zalo';
+
 
 // GET - Lấy danh sách hóa đơn
 export async function GET(request: NextRequest) {
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Tạo hóa đơn mới
+// POST - Tạo hóa đơn hàng tháng (theo kỳ thu của hợp đồng)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -133,201 +133,27 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
 
     const body = await request.json();
-    const {
-      maHoaDon,
-      hopDong,
-      thang,
-      nam,
-      tienPhong,
-      chiSoDienBanDau,
-      chiSoDienCuoiKy,
-      chiSoNuocBanDau,
-      chiSoNuocCuoiKy,
-      phiDichVu,
-      ghiChu
-    } = body;
-
-    // Validate required fields
-    if (!hopDong) {
-      return NextResponse.json(
-        { message: 'Thiếu thông tin bắt buộc' },
-        { status: 400 }
-      );
+    if (!body?.hopDong || !body?.thang || !body?.nam) {
+      return NextResponse.json({ message: 'Thiếu hợp đồng hoặc tháng/năm' }, { status: 400 });
     }
 
-    // Kiểm tra hợp đồng tồn tại
-    const hopDongData = await HopDong.findById(hopDong)
-      .populate('phong')
-      .populate('khachThueId');
-    
-    if (!hopDongData) {
-      return NextResponse.json(
-        { message: 'Hợp đồng không tồn tại' },
-        { status: 404 }
-      );
-    }
+    const hoaDon = await lapHoaDonHangThang({
+      hopDongId: String(body.hopDong),
+      thang: Number(body.thang),
+      nam: Number(body.nam),
+      chiSoDienCuoiKy: body.chiSoDienCuoiKy ?? null,
+      chiSoNuocCuoiKy: body.chiSoNuocCuoiKy ?? null,
+      tienPhong: body.tienPhong ?? null,
+      phiDichVu: Array.isArray(body.phiDichVu) ? body.phiDichVu : null,
+      khoanGiamTru: Array.isArray(body.khoanGiamTru) ? body.khoanGiamTru : null,
+      thayDongHo: body.thayDongHo ?? null,
+      hanThanhToan: body.hanThanhToan || null,
+      ghiChu: body.ghiChu ?? null,
+      maHoaDon: body.maHoaDon ?? null,
+      hinhThucThanhToan: body.hinhThucThanhToan ?? null,
+    }, session.user.id);
 
-    // Tạo mã hóa đơn (sử dụng mã từ frontend hoặc tự sinh)
-    let finalMaHoaDon = maHoaDon;
-    
-    if (!finalMaHoaDon || finalMaHoaDon.trim() === '') {
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const day = String(currentDate.getDate()).padStart(2, '0');
-      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      
-      finalMaHoaDon = `HD${year}${month}${day}${randomNum}`;
-    }
-
-    // Kiểm tra mã hóa đơn đã tồn tại chưa
-    const existingHoaDon = await HoaDon.findOne({ maHoaDon: finalMaHoaDon });
-    if (existingHoaDon) {
-      // Nếu mã từ frontend bị trùng, tự sinh mã mới
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const day = String(currentDate.getDate()).padStart(2, '0');
-      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      
-      finalMaHoaDon = `HD${year}${month}${day}${randomNum}`;
-    }
-
-    let hoaDonData: Record<string, unknown> = {
-      maHoaDon: finalMaHoaDon,
-      hopDong: hopDong,
-      phong: hopDongData.phong,
-      khachThue: hopDongData.nguoiDaiDien,
-      ghiChu
-    };
-
-    // Hóa đơn hàng tháng
-    if (!thang || !nam || tienPhong === undefined) {
-      return NextResponse.json(
-        { message: 'Thiếu thông tin cho hóa đơn hàng tháng' },
-        { status: 400 }
-      );
-    }
-
-    // Kiểm tra hóa đơn tháng này đã tồn tại chưa
-    const existingMonthlyHoaDon = await HoaDon.findOne({
-      hopDong: hopDong,
-      thang,
-      nam
-    });
-    
-    if (existingMonthlyHoaDon) {
-      return NextResponse.json(
-        { message: `Hóa đơn tháng ${thang}/${nam} đã tồn tại` },
-        { status: 400 }
-      );
-    }
-
-    // Tự động tính chỉ số điện nước
-    let chiSoDienBanDauValue = chiSoDienBanDau;
-    let chiSoDienCuoiKyValue = chiSoDienCuoiKy;
-    let chiSoNuocBanDauValue = chiSoNuocBanDau;
-    let chiSoNuocCuoiKyValue = chiSoNuocCuoiKy;
-
-    // Tìm hóa đơn gần nhất để lấy chỉ số cuối kỳ
-    const lastHoaDon = await HoaDon.findOne({
-      hopDong: hopDong,
-      $or: [
-        { nam: { $lt: nam } },
-        { nam: nam, thang: { $lt: thang } }
-      ]
-    }).sort({ nam: -1, thang: -1 });
-
-    if (lastHoaDon) {
-      // Hóa đơn tiếp theo: lấy chỉ số cuối kỳ từ hóa đơn trước
-      chiSoDienBanDauValue = lastHoaDon.chiSoDienCuoiKy;
-      chiSoNuocBanDauValue = lastHoaDon.chiSoNuocCuoiKy;
-    } else {
-      // Hóa đơn đầu tiên: lấy chỉ số ban đầu từ hợp đồng
-      chiSoDienBanDauValue = hopDongData.chiSoDienBanDau;
-      chiSoNuocBanDauValue = hopDongData.chiSoNuocBanDau;
-    }
-
-    // Nếu không có chỉ số cuối kỳ từ form, sử dụng chỉ số ban đầu
-    if (!chiSoDienCuoiKyValue) {
-      chiSoDienCuoiKyValue = chiSoDienBanDauValue;
-    }
-    if (!chiSoNuocCuoiKyValue) {
-      chiSoNuocCuoiKyValue = chiSoNuocBanDauValue;
-    }
-
-    // Tính số điện nước
-    const soDien = chiSoDienCuoiKyValue - chiSoDienBanDauValue;
-    const soNuoc = chiSoNuocCuoiKyValue - chiSoNuocBanDauValue;
-
-    // Tính tiền điện nước
-    const tienDienTinh = soDien * hopDongData.giaDien;
-    const tienNuocTinh = soNuoc * hopDongData.giaNuoc;
-
-    const tongTien = tienPhong + tienDienTinh + tienNuocTinh + (phiDichVu?.reduce((sum: number, phi: PhiDichVu) => sum + phi.gia, 0) || 0);
-
-    hoaDonData = {
-      ...hoaDonData,
-      thang,
-      nam,
-      tienPhong,
-      tienDien: tienDienTinh,
-      soDien,
-      chiSoDienBanDau: chiSoDienBanDauValue,
-      chiSoDienCuoiKy: chiSoDienCuoiKyValue,
-      tienNuoc: tienNuocTinh,
-      soNuoc,
-      chiSoNuocBanDau: chiSoNuocBanDauValue,
-      chiSoNuocCuoiKy: chiSoNuocCuoiKyValue,
-      phiDichVu: phiDichVu || [],
-      tongTien,
-      daThanhToan: 0,
-      conLai: tongTien,
-      trangThai: 'chuaThanhToan',
-      hanThanhToan: new Date(nam, thang - 1, hopDongData.ngayThanhToan) // Hạn thanh toán theo ngày quy định trong hợp đồng
-    };
-
-    const hoaDon = new HoaDon(hoaDonData);
-    await hoaDon.save();
-
-    // Ghi vào sổ công nợ: lưu nợ kỳ trước, tạo bút toán và phân bổ tiền thừa/đóng trước (nếu có)
-    await ghiNhanHoaDonMoi(hoaDon, session.user.id);
-    const congNoMoi = await HoaDon.findById(hoaDon._id).select('noKyTruoc tongCanThanhToan daThanhToan conLai trangThai').lean<Record<string, unknown>>();
-    if (congNoMoi) hoaDon.set(congNoMoi);
-
-    // Populate để trả về dữ liệu đầy đủ
-    await hoaDon.populate([
-      { path: 'hopDong', select: 'maHopDong' },
-      { path: 'phong', select: 'maPhong' },
-      { path: 'khachThue', select: 'hoTen soDienThoai zaloUserId' }
-    ]);
-
-    // Hook tự động gửi Zalo (fire-and-forget) — không block response.
-    // Nếu Zalo lỗi cũng không ảnh hưởng tới việc tạo hóa đơn.
-    (async () => {
-      try {
-        const { getCaiDatHoaDonLean } = await import('@/lib/cai-dat');
-        const settings = await getCaiDatHoaDonLean();
-
-        if (!settings.autoSendZalo) return;
-        const kt = hoaDon.khachThue as unknown as { _id: unknown; hoTen: string; zaloUserId?: string };
-        if (!kt?.zaloUserId) return;
-
-        const { sendInvoiceMessage } = await import('@/lib/zalo');
-        await sendInvoiceMessage({
-          hoaDon: hoaDon.toObject() as unknown as Parameters<typeof sendInvoiceMessage>[0]['hoaDon'],
-          khachThue: { ...kt, _id: String(kt._id) } as Parameters<typeof sendInvoiceMessage>[0]['khachThue'],
-          settings: { ghiChuMacDinh: settings.ghiChuMacDinh, hienMaQR: settings.hienMaQR },
-          trigger: 'auto',
-          recipientType: 'tenant',
-          recipientZaloUserId: kt.zaloUserId,
-          phongId: String(hoaDon.phong),
-          tenNhaTro: (settings as { tenNhaTro?: string }).tenNhaTro || 'Nhà trọ',
-        });
-      } catch (err) {
-        console.error('Auto-send Zalo failed:', err);
-      }
-    })();
+    if (hoaDon) guiZaloTuDong(hoaDon);
 
     return NextResponse.json({
       success: true,
@@ -335,151 +161,59 @@ export async function POST(request: NextRequest) {
       message: 'Tạo hóa đơn thành công'
     });
   } catch (error) {
+    if (error instanceof LapHoaDonError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     console.error('Error creating hoa don:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
 
-// PUT - Cập nhật hóa đơn
+// PUT - Cập nhật hóa đơn. Không đổi hợp đồng/kỳ; daThanhToan/conLai/trangThai do sổ công nợ tính.
 export async function PUT(request: NextRequest) {
   try {
-    console.log('PUT request received for hoa-don');
-    
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      console.log('Unauthorized request');
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
     await connectToDatabase();
-    console.log('Database connected');
 
     const body = await request.json();
-    console.log('Request body:', body);
-    const {
-      id,
-      maHoaDon,
-      hopDong,
-      thang,
-      nam,
-      tienPhong,
-      chiSoDienBanDau,
-      chiSoDienCuoiKy,
-      chiSoNuocBanDau,
-      chiSoNuocCuoiKy,
-      phiDichVu,
-      hanThanhToan,
-      ghiChu
-    } = body;
-    // daThanhToan / conLai / trangThai do sổ công nợ tính — bỏ qua giá trị client gửi lên.
-
-    // Validate required fields
-    if (!id) {
-      console.log('Missing ID');
-      return NextResponse.json(
-        { message: 'Thiếu ID hóa đơn' },
-        { status: 400 }
-      );
+    if (!body?.id) {
+      return NextResponse.json({ message: 'Thiếu ID hóa đơn' }, { status: 400 });
     }
 
-    // Kiểm tra hóa đơn tồn tại
-    console.log('Looking for hoa don with ID:', id);
-    const existingHoaDon = await HoaDon.findById(id);
-    if (!existingHoaDon) {
-      console.log('Hoa don not found');
-      return NextResponse.json(
-        { message: 'Hóa đơn không tồn tại' },
-        { status: 404 }
-      );
-    }
-
-    // Kiểm tra hợp đồng tồn tại
-    console.log('Looking for hop dong with ID:', hopDong);
-    const hopDongData = await HopDong.findById(hopDong);
-    if (!hopDongData) {
-      console.log('Hop dong not found');
-      return NextResponse.json(
-        { message: 'Hợp đồng không tồn tại' },
-        { status: 404 }
-      );
-    }
-
-    // Tính số điện nước
-    const soDien = chiSoDienCuoiKy - chiSoDienBanDau;
-    const soNuoc = chiSoNuocCuoiKy - chiSoNuocBanDau;
-
-    // Tính tiền điện nước
-    const tienDienTinh = soDien * hopDongData.giaDien;
-    const tienNuocTinh = soNuoc * hopDongData.giaNuoc;
-
-    const tongTien = tienPhong + tienDienTinh + tienNuocTinh + (phiDichVu?.reduce((sum: number, phi: PhiDichVu) => sum + phi.gia, 0) || 0);
-
-    // Cập nhật hóa đơn
-    const updatedHoaDon = await HoaDon.findByIdAndUpdate(
-      id,
-      {
-        maHoaDon,
-        hopDong,
-        thang,
-        nam,
-        tienPhong,
-        tienDien: tienDienTinh,
-        soDien,
-        chiSoDienBanDau,
-        chiSoDienCuoiKy,
-        tienNuoc: tienNuocTinh,
-        soNuoc,
-        chiSoNuocBanDau,
-        chiSoNuocCuoiKy,
-        phiDichVu: phiDichVu || [],
-        tongTien,
-        tongCanThanhToan: tongTien + (existingHoaDon.noKyTruoc || 0),
-        hanThanhToan: new Date(hanThanhToan),
-        ghiChu
-      },
-      { new: true }
-    ).populate([
-      { path: 'hopDong', select: 'maHopDong' },
-      { path: 'phong', select: 'maPhong' },
-      { path: 'khachThue', select: 'hoTen soDienThoai' }
-    ]);
-
-    if (updatedHoaDon) {
-      await capNhatButToanHoaDon(
-        { _id: updatedHoaDon._id, khachThue: existingHoaDon.khachThue, hopDong: existingHoaDon.hopDong, phong: existingHoaDon.phong, maHoaDon: updatedHoaDon.maHoaDon, tongTien },
-        session.user.id,
-      );
-    }
-    const hoaDonSauCapNhat = updatedHoaDon
-      ? await HoaDon.findById(updatedHoaDon._id).populate([
-        { path: 'hopDong', select: 'maHopDong' },
-        { path: 'phong', select: 'maPhong' },
-        { path: 'khachThue', select: 'hoTen soDienThoai' }
-      ])
-      : null;
+    const hoaDon = await capNhatHoaDon(String(body.id), {
+      maHoaDon: body.maHoaDon,
+      tienPhong: body.tienPhong,
+      chiSoDienBanDau: body.chiSoDienBanDau,
+      chiSoDienCuoiKy: body.chiSoDienCuoiKy,
+      chiSoNuocBanDau: body.chiSoNuocBanDau,
+      chiSoNuocCuoiKy: body.chiSoNuocCuoiKy,
+      phiDichVu: Array.isArray(body.phiDichVu) ? body.phiDichVu : undefined,
+      khoanGiamTru: Array.isArray(body.khoanGiamTru) ? body.khoanGiamTru : undefined,
+      thayDongHo: body.thayDongHo ?? null,
+      hanThanhToan: body.hanThanhToan || undefined,
+      ghiChu: body.ghiChu,
+      hinhThucThanhToan: body.hinhThucThanhToan,
+    }, session.user.id);
 
     return NextResponse.json({
       success: true,
-      data: hoaDonSauCapNhat,
+      data: hoaDon,
       message: 'Cập nhật hóa đơn thành công'
     });
   } catch (error) {
+    if (error instanceof LapHoaDonError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     console.error('Error updating hoa don:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    return NextResponse.json(
-      { message: 'Internal server error', error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
 
-// DELETE - Xóa hóa đơn
+// DELETE - Xóa hóa đơn (chỉ hóa đơn mới nhất của hợp đồng)
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -489,35 +223,19 @@ export async function DELETE(request: NextRequest) {
 
     await connectToDatabase();
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
+    const id = new URL(request.url).searchParams.get('id');
     if (!id) {
-      return NextResponse.json(
-        { message: 'Thiếu ID hóa đơn' },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: 'Thiếu ID hóa đơn' }, { status: 400 });
     }
 
-    const deletedHoaDon = await HoaDon.findByIdAndDelete(id);
-    if (!deletedHoaDon) {
-      return NextResponse.json(
-        { message: 'Hóa đơn không tồn tại' },
-        { status: 404 }
-      );
-    }
+    await xoaHoaDon(id, session.user.id);
 
-    await huyButToanHoaDon(deletedHoaDon, session.user.id);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Xóa hóa đơn thành công'
-    });
+    return NextResponse.json({ success: true, message: 'Xóa hóa đơn thành công' });
   } catch (error) {
+    if (error instanceof LapHoaDonError) {
+      return NextResponse.json({ message: error.message }, { status: error.status });
+    }
     console.error('Error deleting hoa don:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

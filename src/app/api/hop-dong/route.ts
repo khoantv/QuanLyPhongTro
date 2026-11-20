@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { dauNgayVN, ngayVN } from '@/lib/ky-thu';
+import { getCaiDatHoaDonLean } from '@/lib/cai-dat';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
@@ -23,7 +25,8 @@ const hopDongSchema = z.object({
   giaThue: z.number().min(0, 'Giá thuê phải lớn hơn hoặc bằng 0'),
   tienCoc: z.number().min(0, 'Tiền cọc phải lớn hơn hoặc bằng 0'),
   chuKyThanhToan: z.enum(['thang', 'quy', 'nam']),
-  ngayThanhToan: z.number().min(1).max(31, 'Ngày thanh toán phải từ 1-31'),
+  // Bỏ trống → lấy CaiDatHoaDon.ngayLapHoaDon, nếu không có thì lấy ngày của ngày bắt đầu
+  ngayThanhToan: z.number().min(1).max(31, 'Ngày thanh toán phải từ 1-31').optional(),
   dieuKhoan: z.string().min(1, 'Điều khoản là bắt buộc'),
   giaDien: z.number().min(0, 'Giá điện phải lớn hơn hoặc bằng 0'),
   giaNuoc: z.number().min(0, 'Giá nước phải lớn hơn hoặc bằng 0'),
@@ -167,11 +170,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ngayBatDau = dauNgayVN(validatedData.ngayBatDau);
+    let ngayThanhToan = validatedData.ngayThanhToan;
+    if (!ngayThanhToan) {
+      const caiDat = await getCaiDatHoaDonLean();
+      ngayThanhToan = caiDat.ngayLapHoaDon ?? ngayVN(ngayBatDau).ngay;
+    }
+
     const newHopDong = new HopDong({
       ...validatedData,
-      ngayBatDau: new Date(validatedData.ngayBatDau),
+      ngayThanhToan,
+      ngayBatDau,
       ngayKetThuc: new Date(validatedData.ngayKetThuc),
       phiDichVu: validatedData.phiDichVu || [],
+      // Tiền phòng chưa được lập hóa đơn ngày nào — hóa đơn đầu sẽ thu tiền phòng lẻ từ ngày bắt đầu
+      daThuTienPhongDen: ngayBatDau,
     });
 
     await newHopDong.save();
@@ -189,7 +202,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { message: error.errors[0].message },
+        { message: error.issues[0].message },
         { status: 400 }
       );
     }

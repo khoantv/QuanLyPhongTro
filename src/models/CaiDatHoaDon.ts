@@ -14,6 +14,8 @@ export interface ICaiDatHoaDon extends Document {
   hinhThucThanhToanMacDinh: HinhThucThanhToan;
   ghiChuMacDinh: string;
   xuLyTienThuaMacDinh: 'truKySau' | 'khongTru';
+  /** Khi khách tự trả phòng có hoàn tiền phòng đã thu trước cho những ngày chưa ở không */
+  hoanTienPhongKhiTraPhong: boolean;
   ngayTao: Date;
   ngayCapNhat: Date;
 }
@@ -58,6 +60,7 @@ const CaiDatHoaDonSchema = new Schema<ICaiDatHoaDon>({
     enum: ['truKySau', 'khongTru'],
     default: 'truKySau',
   },
+  hoanTienPhongKhiTraPhong: { type: Boolean, default: false },
 }, {
   timestamps: { createdAt: 'ngayTao', updatedAt: 'ngayCapNhat' },
 });

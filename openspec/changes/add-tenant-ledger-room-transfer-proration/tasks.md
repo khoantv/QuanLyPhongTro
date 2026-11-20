@@ -22,19 +22,19 @@
 
 ## 3. M2 — Kỳ thu & tiền phòng theo ngày (rent-proration, invoice-generation)
 
-- [ ] 3.1 Tạo `src/lib/ky-thu.ts`: `ngayThu`, `kyThuChua`, `soNgayCuaKy`, `tienPhongTheoNgay` (timezone `Asia/Ho_Chi_Minh`, khoảng nửa mở)
-- [ ] 3.2 Unit test `ky-thu.ts`: các ví dụ trong spec (16/30 ngày, trọn kỳ 31 ngày, khoảng âm, ngày 31 tháng 2)
-- [ ] 3.3 Sửa `src/models/HopDong.ts`: thêm `daThuTienPhongDen`, `hopDongTruoc`, `hopDongSau`, `lyDoKetThuc`, `ngayTraPhong`; enum `trangThai` thêm `daThanhLy`; khi tạo hợp đồng mặc định `daThuTienPhongDen=ngayBatDau`, `ngayThanhToan` mặc định từ `CaiDatHoaDon.ngayLapHoaDon`
-- [ ] 3.4 Sửa `src/models/HoaDon.ts`: mở rộng dòng `phiDichVu` thành `{ten, gia, loai, chiTiet?}` (dữ liệu cũ coi là `dichVu`); thêm `loaiHoaDon`, `kyBatDau`, `kyKetThuc`, `khoanGiamTru[]`, `tienLamTron`, `hinhThucThanhToan`; unique `{hopDong, kyBatDau}` (partial: `loaiHoaDon='hangThang'`)
-- [ ] 3.5 Tạo `src/lib/hoa-don/lap-hoa-don.ts`: hàm dùng chung tính chỉ số đầu/cuối, tiền phòng + tiền phòng lẻ, dịch vụ, giảm trừ, làm tròn, hạn đóng, `noKyTruoc`; ghi bút toán; đẩy `daThuTienPhongDen`; recompute; trigger Zalo
-- [ ] 3.6 Viết lại `POST /api/hoa-don` dùng `lap-hoa-don.ts`; validate chỉ số giảm (trừ `thayDongHo`)
-- [ ] 3.7 Viết lại `PUT /api/hoa-don`: tính lại server-side, cập nhật bút toán, bỏ qua `daThanhToan/conLai/trangThai` từ client
-- [ ] 3.8 Sửa `DELETE /api/hoa-don`: chỉ xóa hóa đơn mới nhất, hủy mềm bút toán, khôi phục `daThuTienPhongDen`
-- [ ] 3.9 Viết lại `POST/GET /api/auto-invoice` theo ngày thu từng hợp đồng, dùng `lap-hoa-don.ts`
-- [ ] 3.10 Sửa `GET /api/hoa-don/latest-reading`: trả thêm tiền phòng lẻ dự kiến, kỳ thu, nợ kỳ trước
-- [ ] 3.11 UI form tạo/sửa hóa đơn: đổi mục "Thêm phí dịch vụ" thành "Phí dịch vụ & khoản thu khác" — tự điền phí hợp đồng + dòng tiền phòng lẻ (gợi ý cách tính, nút "Tính lại"), cho thêm dòng `khac`, chặn số âm; thêm mục "Giảm trừ"; hiển thị kỳ thu, làm tròn, nợ kỳ trước; điền sẵn ghi chú / hình thức thanh toán từ cài đặt
-- [ ] 3.11a Bản in, PDF, template Zalo, bảng thu tiền: hiển thị các dòng `phiDichVu` theo `loai` và các dòng giảm trừ
-- [ ] 3.12 Thêm field `hoanTienPhongKhiTraPhong` vào `CaiDatHoaDon` + toggle ở trang cài đặt phiếu thu
+- [x] 3.1 Tạo `src/lib/ky-thu.ts`: `ngayThu`, `kyThuChua`, `soNgayCuaKy`, `tienPhongTheoNgay` (timezone `Asia/Ho_Chi_Minh`, khoảng nửa mở)
+- [x] 3.2 Unit test `ky-thu.ts`: các ví dụ trong spec (16/30 ngày, trọn kỳ 31 ngày, khoảng âm, ngày 31 tháng 2)
+- [x] 3.3 Sửa `src/models/HopDong.ts`: thêm `daThuTienPhongDen`, `hopDongTruoc`, `hopDongSau`, `lyDoKetThuc`, `ngayTraPhong`; enum `trangThai` thêm `daThanhLy`; khi tạo hợp đồng mặc định `daThuTienPhongDen=ngayBatDau`, `ngayThanhToan` mặc định từ `CaiDatHoaDon.ngayLapHoaDon`
+- [x] 3.4 Sửa `src/models/HoaDon.ts`: mở rộng dòng `phiDichVu` thành `{ten, gia, loai, chiTiet?}` (dữ liệu cũ coi là `dichVu`); thêm `loaiHoaDon`, `kyBatDau`, `kyKetThuc`, `khoanGiamTru[]`, `tienLamTron`, `hinhThucThanhToan`; unique `{hopDong, kyBatDau}` (partial: `loaiHoaDon='hangThang'`)
+- [x] 3.5 Tạo `src/lib/hoa-don/lap-hoa-don.ts`: hàm dùng chung tính chỉ số đầu/cuối, tiền phòng + tiền phòng lẻ, dịch vụ, giảm trừ, làm tròn, hạn đóng, `noKyTruoc`; ghi bút toán; đẩy `daThuTienPhongDen`; recompute; trigger Zalo
+- [x] 3.6 Viết lại `POST /api/hoa-don` dùng `lap-hoa-don.ts`; validate chỉ số giảm (trừ `thayDongHo`)
+- [x] 3.7 Viết lại `PUT /api/hoa-don`: tính lại server-side, cập nhật bút toán, bỏ qua `daThanhToan/conLai/trangThai` từ client
+- [x] 3.8 Sửa `DELETE /api/hoa-don`: chỉ xóa hóa đơn mới nhất, hủy mềm bút toán, khôi phục `daThuTienPhongDen`
+- [x] 3.9 Viết lại `POST/GET /api/auto-invoice` theo ngày thu từng hợp đồng, dùng `lap-hoa-don.ts`
+- [x] 3.10 Sửa `GET /api/hoa-don/latest-reading`: trả thêm tiền phòng lẻ dự kiến, kỳ thu, nợ kỳ trước
+- [x] 3.11 UI form tạo/sửa hóa đơn: đổi mục "Thêm phí dịch vụ" thành "Phí dịch vụ & khoản thu khác" — tự điền phí hợp đồng + dòng tiền phòng lẻ (gợi ý cách tính, nút "Tính lại"), cho thêm dòng `khac`, chặn số âm; thêm mục "Giảm trừ"; hiển thị kỳ thu, làm tròn, nợ kỳ trước; điền sẵn ghi chú / hình thức thanh toán từ cài đặt
+- [x] 3.11a Bản in, PDF, template Zalo, bảng thu tiền: hiển thị các dòng `phiDichVu` theo `loai` và các dòng giảm trừ
+- [x] 3.12 Thêm field `hoanTienPhongKhiTraPhong` vào `CaiDatHoaDon` + toggle ở trang cài đặt phiếu thu
 
 ## 4. M3 — Chuyển phòng & trả phòng (room-transfer-checkout)
 
@@ -63,7 +63,7 @@
 - [ ] 6.1 `npm run build` và `npm run lint` xanh
 - [ ] 6.2 Chạy `scripts/migrate-cong-no.ts --dry-run` trên bản sao dữ liệu thật, rà báo cáo chênh lệch
 - [ ] 6.3 Manual test: đóng thiếu → tháng sau hiện nợ kỳ trước; đóng thừa → tháng sau trừ; đóng trước khi chưa có hóa đơn
-- [ ] 6.4 Manual test: khách mới vào giữa kỳ → hóa đơn đầu có tiền phòng lẻ đúng
+- [x] 6.4 Manual test: khách mới vào giữa kỳ → hóa đơn đầu có tiền phòng lẻ đúng
 - [ ] 6.5 Manual test: chuyển phòng giữa kỳ và trước kỳ thu đầu; trả phòng có/không hoàn tiền phòng, có trừ cọc
-- [ ] 6.6 Manual test: auto-invoice với hai nhóm ngày thu 10 và 21
+- [x] 6.6 Manual test: auto-invoice với hai nhóm ngày thu 10 và 21
 - [ ] 6.7 Cập nhật `README.md`: quy trình thu tiền, chuyển phòng, trả phòng, migration công nợ

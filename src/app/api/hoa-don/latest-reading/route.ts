@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
-import HoaDon from '@/models/HoaDon';
-import HopDong from '@/models/HopDong';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { tinhHoaDonHangThang, LapHoaDonError } from '@/lib/hoa-don/lap-hoa-don';
 
-// GET - Lấy chỉ số điện nước mới nhất cho hợp đồng
+/**
+ * GET /api/hoa-don/latest-reading?hopDong=&thang=&nam=[&chiSoDienCuoiKy=&chiSoNuocCuoiKy=]
+ * Xem trước hóa đơn hàng tháng: kỳ thu, chỉ số đầu kỳ (và cuối kỳ nếu đã ghi), tiền phòng lẻ,
+ * phí hợp đồng, làm tròn, nợ kỳ trước, hạn đóng. Không ghi DB.
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -17,64 +20,36 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const hopDongId = searchParams.get('hopDong');
-    const thang = parseInt(searchParams.get('thang') || '1');
-    const nam = parseInt(searchParams.get('nam') || new Date().getFullYear());
+    const now = new Date();
+    const thang = parseInt(searchParams.get('thang') || String(now.getMonth() + 1));
+    const nam = parseInt(searchParams.get('nam') || String(now.getFullYear()));
+    const soHoacNull = (k: string) => {
+      const v = searchParams.get(k);
+      return v === null || v === '' ? null : Number(v);
+    };
 
     if (!hopDongId) {
-      return NextResponse.json(
-        { message: 'Thiếu ID hợp đồng' },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: 'Thiếu ID hợp đồng' }, { status: 400 });
     }
 
-    // Kiểm tra hợp đồng tồn tại
-    const hopDongData = await HopDong.findById(hopDongId);
-    if (!hopDongData) {
-      return NextResponse.json(
-        { message: 'Hợp đồng không tồn tại' },
-        { status: 404 }
-      );
-    }
-
-    // Tìm hóa đơn gần nhất để lấy chỉ số cuối kỳ
-    const lastHoaDon = await HoaDon.findOne({
-      hopDong: hopDongId,
-      $or: [
-        { nam: { $lt: nam } },
-        { nam: nam, thang: { $lt: thang } }
-      ]
-    }).sort({ nam: -1, thang: -1 });
-
-    let chiSoDienBanDau = 0;
-    let chiSoNuocBanDau = 0;
-
-    if (lastHoaDon) {
-      // Hóa đơn tiếp theo: lấy chỉ số cuối kỳ từ hóa đơn trước
-      chiSoDienBanDau = lastHoaDon.chiSoDienCuoiKy || 0;
-      chiSoNuocBanDau = lastHoaDon.chiSoNuocCuoiKy || 0;
-    } else {
-      // Hóa đơn đầu tiên: lấy chỉ số ban đầu từ hợp đồng
-      chiSoDienBanDau = hopDongData.chiSoDienBanDau || 0;
-      chiSoNuocBanDau = hopDongData.chiSoNuocBanDau || 0;
-    }
+    const bt = await tinhHoaDonHangThang({
+      hopDongId,
+      thang,
+      nam,
+      chiSoDienCuoiKy: soHoacNull('chiSoDienCuoiKy'),
+      chiSoNuocCuoiKy: soHoacNull('chiSoNuocCuoiKy'),
+    });
 
     return NextResponse.json({
       success: true,
-      data: {
-        chiSoDienBanDau,
-        chiSoNuocBanDau,
-        isFirstInvoice: !lastHoaDon,
-        lastInvoiceMonth: lastHoaDon ? `${lastHoaDon.thang}/${lastHoaDon.nam}` : null
-      },
-      message: lastHoaDon 
-        ? `Lấy chỉ số từ hóa đơn ${lastHoaDon.thang}/${lastHoaDon.nam}` 
-        : 'Lấy chỉ số ban đầu từ hợp đồng'
+      data: bt,
+      message: `Kỳ thu ${bt.kyBatDau.toISOString()}`,
     });
   } catch (error) {
-    console.error('Error fetching latest electricity reading:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    if (error instanceof LapHoaDonError) {
+      return NextResponse.json({ success: false, message: error.message }, { status: error.status });
+    }
+    console.error('Error previewing hoa don:', error);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
