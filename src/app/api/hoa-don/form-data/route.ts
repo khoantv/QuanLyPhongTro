@@ -21,7 +21,8 @@ export async function GET() {
       Phong.find()
         .select('maPhong toaNha tang dienTich giaThue trangThai')
         .populate('toaNha', 'tenToaNha')
-        .sort({ maPhong: 1 }),
+        .sort({ maPhong: 1 })
+        .collation({ locale: 'vi', numericOrdering: true }),
       KhachThue.find()
         .select('hoTen soDienThoai email trangThai')
         .sort({ hoTen: 1 }),

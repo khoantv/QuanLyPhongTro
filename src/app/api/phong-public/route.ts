@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     const phongList = await Phong.find(query)
       .populate('toaNha', 'tenToaNha diaChi')
       .sort({ maPhong: 1 })
+      .collation({ locale: 'vi', numericOrdering: true })
       .skip((page - 1) * limit)
       .limit(limit);
 
