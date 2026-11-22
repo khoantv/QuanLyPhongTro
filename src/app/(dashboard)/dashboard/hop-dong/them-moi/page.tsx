@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { HopDong, Phong, KhachThue } from '@/types';
 import { toast } from 'sonner';
+import { danhDauDuLieuThayDoi } from '@/hooks/use-cache';
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -215,7 +216,7 @@ export default function ThemMoiHopDongPage() {
       if (response.ok) {
         const result = await response.json();
         // Xóa cache để force refresh data
-        sessionStorage.removeItem('hop-dong-data');
+        danhDauDuLieuThayDoi();
         toast.success(result.message || 'Đã tạo hợp đồng thành công');
         // Sử dụng replace để không tạo history entry mới
         // và refresh để cập nhật dữ liệu server-side

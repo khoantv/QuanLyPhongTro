@@ -14,6 +14,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { DynamicBreadcrumb } from '@/components/ui/dynamic-breadcrumb';
 import { PageProgress } from '@/components/ui/page-progress';
+import { caiTheoDoiGhiDuLieu } from '@/hooks/use-cache';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,11 @@ interface DashboardLayoutProps {
 function DashboardLayoutContent({ children }: DashboardLayoutProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  // Thêm/sửa/xóa dữ liệu ở bất kỳ trang nào → cache danh sách ở các trang khác tự hết hiệu lực
+  useEffect(() => {
+    caiTheoDoiGhiDuLieu();
+  }, []);
 
   useEffect(() => {
     if (status === 'loading') return;

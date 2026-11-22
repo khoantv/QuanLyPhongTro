@@ -27,6 +27,7 @@ import {
 import { HoaDon, HopDong, Phong, KhachThue, PhiDichVu, KhoanGiamTru } from '@/types';
 import { PhiDichVuEditor, GiamTruEditor, lamTron1000 } from '@/components/hoa-don/khoan-thu-editor';
 import { toast } from 'sonner';
+import { danhDauDuLieuThayDoi } from '@/hooks/use-cache';
 
 // Helper functions
 const getPhongName = (phongId: string | Phong, phongList: Phong[]) => {
@@ -240,7 +241,7 @@ export default function ChinhSuaHoaDonPage() {
       if (response.ok) {
         const result = await response.json();
         // Xóa cache
-        sessionStorage.removeItem('hoa-don-data');
+        danhDauDuLieuThayDoi();
         toast.success(result.message || 'Hóa đơn đã được cập nhật thành công');
         router.replace('/dashboard/hoa-don');
         router.refresh();
