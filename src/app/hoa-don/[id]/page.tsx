@@ -29,6 +29,20 @@ const getPhongName = (phongId: string | Phong) => {
   return 'N/A';
 };
 
+const getMaHopDong = (hopDong: string | HopDong | null | undefined) => {
+  if (hopDong && typeof hopDong === 'object' && hopDong.maHopDong) {
+    return hopDong.maHopDong;
+  }
+  return 'N/A';
+};
+
+// Còn phải trả tính cả nợ kỳ trước (API trả tongConLai theo sổ công nợ); hóa đơn cũ không có thì dùng conLai
+const conLaiTong = (hoaDon: HoaDon) => hoaDon.tongConLai ?? hoaDon.conLai;
+
+// Đã thanh toán trên tổng cần thanh toán (nợ kỳ trước + kỳ này), khớp với "Còn lại"
+const daThanhToanTong = (hoaDon: HoaDon) =>
+  Math.max(0, (hoaDon.tongCanThanhToan ?? hoaDon.tongTien + (hoaDon.noKyTruoc ?? 0)) - conLaiTong(hoaDon));
+
 const getKhachThueName = (khachThueId: string | KhachThue) => {
   if (!khachThueId) return 'N/A';
   if (typeof khachThueId === 'object' && khachThueId.hoTen) {
@@ -70,6 +84,14 @@ const getMethodBadge = (method: string) => {
     default:
       return <Badge variant="outline">{method}</Badge>;
   }
+};
+
+// Tài khoản nhận tiền hiển thị trên hóa đơn và mã VietQR (970422 = mã BIN của MB Bank)
+const NGAN_HANG = {
+  maBin: '970422',
+  ten: 'MB Bank (Quân đội)',
+  soTaiKhoan: '0946090193',
+  chuTaiKhoan: 'TRUONG VAN KHOAN',
 };
 
 export default function PublicInvoicePage() {
@@ -139,7 +161,7 @@ export default function PublicInvoicePage() {
               <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333;">Thông tin phòng</h3>
               <p style="margin: 5px 0; font-size: 14px;"><strong>Phòng:</strong> ${getPhongName(hoaDon.phong)}</p>
               <p style="margin: 5px 0; font-size: 14px;"><strong>Khách thuê:</strong> ${getKhachThueName(hoaDon.khachThue)}</p>
-              <p style="margin: 5px 0; font-size: 14px;"><strong>Hợp đồng:</strong> N/A</p>
+              <p style="margin: 5px 0; font-size: 14px;"><strong>Hợp đồng:</strong> ${getMaHopDong(hoaDon.hopDong)}</p>
             </div>
             <div style="flex: 1;">
               <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333;">Thông tin thanh toán</h3>
@@ -219,12 +241,12 @@ export default function PublicInvoicePage() {
             </div>` : ''}
             <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
               <span>Đã thanh toán:</span>
-              <span style="color: #10b981;">${formatCurrency(hoaDon.daThanhToan)}</span>
+              <span style="color: #10b981;">${formatCurrency(daThanhToanTong(hoaDon))}</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 14px;">
               <span>Còn lại:</span>
               <span style="color: #10b981; font-weight: bold;">
-                ${formatCurrency(hoaDon.conLai)}
+                ${formatCurrency(conLaiTong(hoaDon))}
               </span>
             </div>
           </div>
@@ -343,7 +365,7 @@ export default function PublicInvoicePage() {
                     <h3 className="font-semibold mb-2">Thông tin phòng</h3>
                     <p><strong>Phòng:</strong> {getPhongName(hoaDon.phong)}</p>
                     <p><strong>Khách thuê:</strong> {getKhachThueName(hoaDon.khachThue)}</p>
-                    <p><strong>Hợp đồng:</strong> N/A</p>
+                    <p><strong>Hợp đồng:</strong> {getMaHopDong(hoaDon.hopDong)}</p>
                   </div>
                   <div>
                     <h3 className="font-semibold mb-2">Thông tin thanh toán</h3>
@@ -451,12 +473,12 @@ export default function PublicInvoicePage() {
                   )}
                   <div className="flex justify-between">
                     <span>Đã thanh toán:</span>
-                    <span className="text-green-600">{formatCurrency(hoaDon.daThanhToan)}</span>
+                    <span className="text-green-600">{formatCurrency(daThanhToanTong(hoaDon))}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Còn lại:</span>
-                    <span className={hoaDon.conLai > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
-                      {formatCurrency(hoaDon.conLai)}
+                    <span className={conLaiTong(hoaDon) > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}>
+                      {formatCurrency(conLaiTong(hoaDon))}
                     </span>
                   </div>
                 </div>
@@ -475,7 +497,7 @@ export default function PublicInvoicePage() {
           {/* Mã QR và Lịch sử thanh toán */}
           <div className="space-y-6">
             {/* Mã QR Chuyển khoản */}
-            {hoaDon.conLai > 0 && (
+            {conLaiTong(hoaDon) > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -491,7 +513,7 @@ export default function PublicInvoicePage() {
                     {/* QR Code */}
                     <div className="flex justify-center">
                       <img
-                        src={`https://img.vietqr.io/image/970422-7320012003-compact2.png?amount=${hoaDon.conLai}&addInfo=Thanh%20toan%20${hoaDon.maHoaDon}&accountName=CHU%20TRO`}
+                        src={`https://img.vietqr.io/image/${NGAN_HANG.maBin}-${NGAN_HANG.soTaiKhoan}-compact2.png?amount=${conLaiTong(hoaDon)}&addInfo=${encodeURIComponent(`Thanh toan ${hoaDon.maHoaDon}`)}&accountName=${encodeURIComponent(NGAN_HANG.chuTaiKhoan)}`}
                         alt="VietQR Code"
                         className="w-full max-w-[280px] border-2 border-gray-200 rounded-lg"
                       />
@@ -501,20 +523,20 @@ export default function PublicInvoicePage() {
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
                       <div className="text-sm">
                         <div className="text-gray-600">Ngân hàng</div>
-                        <div className="font-semibold">MB Bank (Quân đội)</div>
+                        <div className="font-semibold">{NGAN_HANG.ten}</div>
                       </div>
                       <div className="text-sm">
                         <div className="text-gray-600">Số tài khoản</div>
-                        <div className="font-semibold font-mono">7320012003</div>
+                        <div className="font-semibold font-mono">{NGAN_HANG.soTaiKhoan}</div>
                       </div>
                       <div className="text-sm">
                         <div className="text-gray-600">Chủ tài khoản</div>
-                        <div className="font-semibold">CHU TRO</div>
+                        <div className="font-semibold">{NGAN_HANG.chuTaiKhoan}</div>
                       </div>
                       <div className="text-sm">
                         <div className="text-gray-600">Số tiền</div>
                         <div className="font-bold text-lg text-red-600">
-                          {formatCurrency(hoaDon.conLai)}
+                          {formatCurrency(conLaiTong(hoaDon))}
                         </div>
                       </div>
                       <div className="text-sm">

@@ -307,3 +307,27 @@ export async function huyThanhToan(thanhToan: { _id: Id; khachThue: Id }, nguoiI
   await huyButToan({ thanhToan: toId(thanhToan._id) }, { nguoiHuy: nguoiId, lyDo: 'Xóa thanh toán' });
   return recomputeCongNo(thanhToan.khachThue);
 }
+
+/**
+ * Số tiền khách còn phải trả tính đến hóa đơn này (dùng cho hóa đơn gửi khách / mã QR):
+ * nợ kỳ trước + hóa đơn này − mọi khoản đã thanh toán, không tính các hóa đơn lập sau.
+ * Khác `conLai` của hóa đơn — chỉ là phần chưa trả của riêng hóa đơn (nợ cũ được trừ trước theo FIFO).
+ */
+export async function tinhConLaiDenHoaDon(hoaDon: {
+  _id: Id;
+  khachThue: Id | { _id: Id };
+  ngayTao: Date;
+}): Promise<number> {
+  const khachThue = refId(hoaDon.khachThue);
+  if (!khachThue) return 0;
+  const hoaDonSau = await HoaDon.find({ khachThue: toId(khachThue), ngayTao: { $gt: hoaDon.ngayTao } })
+    .select('_id')
+    .lean<Array<{ _id: mongoose.Types.ObjectId }>>();
+  const butToanHoaDonSau = hoaDonSau.length
+    ? await GiaoDichCongNo.find({ hoaDon: { $in: hoaDonSau.map((h) => h._id) }, loai: 'hoaDon', daHuy: false })
+        .select('_id')
+        .lean<Array<{ _id: mongoose.Types.ObjectId }>>()
+    : [];
+  const soDu = await soDuCongNo(khachThue, butToanHoaDonSau.map((b) => b._id));
+  return Math.max(0, soDu);
+}

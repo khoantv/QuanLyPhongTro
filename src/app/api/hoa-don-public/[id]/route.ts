@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import HoaDon from '@/models/HoaDon';
 import ThanhToan from '@/models/ThanhToan';
+import mongoose from 'mongoose';
+import { tinhConLaiDenHoaDon } from '@/lib/cong-no';
 
 export async function GET(
   request: NextRequest,
@@ -21,10 +23,11 @@ export async function GET(
 
     // Lấy thông tin hóa đơn với populate
     const hoaDon = await HoaDon.findById(hoaDonId)
-      .populate('hopDong')
-      .populate('phong')
-      .populate('khachThue')
-      .lean();
+      // Link công khai: chỉ trả các trường cần hiển thị, không lộ CCCD / thông tin cá nhân khác
+      .populate('hopDong', 'maHopDong')
+      .populate('phong', 'maPhong')
+      .populate('khachThue', 'hoTen')
+      .lean<Record<string, unknown> & { _id: mongoose.Types.ObjectId; khachThue: { _id: mongoose.Types.ObjectId } | null; ngayTao: Date }>();
 
     if (!hoaDon) {
       return NextResponse.json(
@@ -38,10 +41,13 @@ export async function GET(
       .sort({ ngayThanhToan: -1 })
       .lean();
 
+    // Tổng còn phải trả tính cả nợ kỳ trước (dùng cho "Còn lại" và mã QR)
+    const tongConLai = hoaDon.khachThue ? await tinhConLaiDenHoaDon({ _id: hoaDon._id, khachThue: hoaDon.khachThue, ngayTao: hoaDon.ngayTao }) : 0;
+
     return NextResponse.json({
       success: true,
       data: {
-        hoaDon,
+        hoaDon: { ...hoaDon, tongConLai },
         thanhToanList
       }
     });

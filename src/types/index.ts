@@ -292,6 +292,8 @@ export interface HoaDon {
   noKyTruoc?: number;
   /** tongTien + noKyTruoc */
   tongCanThanhToan?: number;
+  /** Chỉ có từ API hóa đơn công khai: còn phải trả tính cả nợ kỳ trước (theo sổ công nợ) */
+  tongConLai?: number;
   khoanGiamTru?: KhoanGiamTru[];
   loaiHoaDon?: 'hangThang' | 'chotPhong';
   kyBatDau?: string | Date | null;

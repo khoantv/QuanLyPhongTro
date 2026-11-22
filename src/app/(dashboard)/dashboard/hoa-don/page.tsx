@@ -300,7 +300,22 @@ export default function HoaDonPage() {
     });
   };
 
-  const handleDownload = (hoaDon: HoaDon) => {
+  // Bản in gửi khách: "Còn lại" tính cả nợ kỳ trước, lấy theo sổ công nợ (giống trang hóa đơn công khai)
+  const layTongConLai = async (hoaDon: HoaDon) => {
+    let conLai = hoaDon.conLai;
+    try {
+      const res = await fetch(`/api/hoa-don-public/${hoaDon._id}`);
+      const json = await res.json();
+      if (typeof json?.data?.hoaDon?.tongConLai === 'number') conLai = json.data.hoaDon.tongConLai;
+    } catch {
+      // Lỗi mạng → dùng conLai của riêng hóa đơn
+    }
+    const tongCan = hoaDon.tongCanThanhToan ?? hoaDon.tongTien + (hoaDon.noKyTruoc ?? 0);
+    return { conLai, daThanhToan: Math.max(0, tongCan - conLai) };
+  };
+
+  const handleDownload = async (hoaDon: HoaDon) => {
+    const tong = await layTongConLai(hoaDon);
     // Create a simple HTML invoice and download as PDF
     const invoiceHtml = `
       <!DOCTYPE html>
@@ -373,11 +388,11 @@ export default function HoaDonPage() {
           </div>` : ''}
           <div class="item">
             <span>Đã thanh toán:</span>
-            <span>${formatCurrency(hoaDon.daThanhToan)}</span>
+            <span>${formatCurrency(tong.daThanhToan)}</span>
           </div>
           <div class="item">
             <span>Còn lại:</span>
-            <span>${formatCurrency(hoaDon.conLai)}</span>
+            <span>${formatCurrency(tong.conLai)}</span>
           </div>
         </div>
         
@@ -404,6 +419,7 @@ export default function HoaDonPage() {
 
   const handleScreenshot = async (hoaDon: HoaDon) => {
     try {
+      const tong = await layTongConLai(hoaDon);
       // Tạo element tạm thời để chụp ảnh
       const tempElement = document.createElement('div');
       tempElement.innerHTML = `
@@ -508,12 +524,12 @@ export default function HoaDonPage() {
             </div>` : ''}
             <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px;">
               <span>Đã thanh toán:</span>
-              <span style="color: #10b981;">${formatCurrency(hoaDon.daThanhToan)}</span>
+              <span style="color: #10b981;">${formatCurrency(tong.daThanhToan)}</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 14px;">
               <span>Còn lại:</span>
               <span style="color: #10b981; font-weight: bold;">
-                ${formatCurrency(hoaDon.conLai)}
+                ${formatCurrency(tong.conLai)}
               </span>
             </div>
           </div>
