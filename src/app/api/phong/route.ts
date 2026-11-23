@@ -23,6 +23,8 @@ const phongSchema = z.object({
   anhPhong: z.array(z.string()).optional(),
   tienNghi: z.array(z.string()).optional(),
   soNguoiToiDa: z.number().min(1, 'Số người tối đa phải lớn hơn 0').max(10, 'Số người tối đa không được quá 10'),
+  // Chỉ đặt tay được "Bảo trì" / "Trống"; "Đang thuê" / "Đã đặt" do hợp đồng quyết định (bị bỏ qua)
+  trangThai: z.enum(['trong', 'daDat', 'dangThue', 'baoTri']).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -66,7 +68,8 @@ export async function GET(request: NextRequest) {
     const collation = { locale: 'vi', numericOrdering: true };
 
     // 1. Đồng bộ trạng thái phòng theo hợp đồng — gộp cho mọi phòng trong phạm vi lọc (không tính
-    //    bộ lọc trạng thái, để lọc theo trạng thái dùng giá trị đã cập nhật). Quy tắc giống calculatePhongStatus.
+    //    bộ lọc trạng thái, để lọc theo trạng thái dùng giá trị đã cập nhật). Quy tắc giống updatePhongStatus:
+    //    có hợp đồng → dangThue / daDat; không có → trong, riêng phòng đang baoTri thì giữ baoTri.
     const { trangThai: _boLocTrangThai, ...queryKhongTrangThai } = query;
     void _boLocTrangThai;
     const phamVi = await Phong.find(queryKhongTrangThai).select('_id trangThai').lean<Array<{ _id: mongoose.Types.ObjectId; trangThai: string }>>();
@@ -81,6 +84,8 @@ export async function GET(request: NextRequest) {
     }
     const capNhatTrangThai = phamVi
       .map((p) => ({ p, moi: trangThaiMoi.get(String(p._id)) ?? 'trong' }))
+      // Phòng "Bảo trì" không có hợp đồng thì giữ nguyên
+      .map(({ p, moi }) => ({ p, moi: moi === 'trong' && p.trangThai === 'baoTri' ? 'baoTri' : moi }))
       .filter(({ p, moi }) => p.trangThai !== moi)
       .map(({ p, moi }) => ({ updateOne: { filter: { _id: p._id }, update: { $set: { trangThai: moi } } } }));
     if (capNhatTrangThai.length) await Phong.bulkWrite(capNhatTrangThai);
@@ -209,7 +214,8 @@ export async function POST(request: NextRequest) {
       ...validatedData,
       anhPhong: validatedData.anhPhong || [],
       tienNghi: validatedData.tienNghi || [],
-      trangThai: 'trong', // Mặc định là trống, sẽ được cập nhật tự động
+      // Mặc định trống (tự cập nhật theo hợp đồng); cho phép tạo phòng ở trạng thái Bảo trì
+      trangThai: validatedData.trangThai === 'baoTri' ? 'baoTri' : 'trong',
     });
 
     await newPhong.save();

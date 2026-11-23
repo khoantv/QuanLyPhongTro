@@ -929,11 +929,14 @@ function PhongForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="trong" className="text-sm">Trống</SelectItem>
-                  <SelectItem value="daDat" className="text-sm">Đã đặt</SelectItem>
-                  <SelectItem value="dangThue" className="text-sm">Đang thuê</SelectItem>
+                  <SelectItem value="daDat" className="text-sm" disabled>Đã đặt (theo hợp đồng)</SelectItem>
+                  <SelectItem value="dangThue" className="text-sm" disabled>Đang thuê (theo hợp đồng)</SelectItem>
                   <SelectItem value="baoTri" className="text-sm">Bảo trì</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                &quot;Đang thuê&quot; / &quot;Đã đặt&quot; tự cập nhật theo hợp đồng. Phòng Bảo trì giữ nguyên tới khi bạn chọn lại Trống hoặc tạo hợp đồng.
+              </p>
             </div>
           </div>
 

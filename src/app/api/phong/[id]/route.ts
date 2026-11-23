@@ -6,6 +6,7 @@ import Phong from '@/models/Phong';
 import ToaNha from '@/models/ToaNha';
 import HopDong from '@/models/HopDong';
 import { updatePhongStatus } from '@/lib/status-utils';
+import HopDong from '@/models/HopDong';
 import { z } from 'zod';
 
 const phongSchema = z.object({
@@ -19,6 +20,8 @@ const phongSchema = z.object({
   anhPhong: z.array(z.string()).optional(),
   tienNghi: z.array(z.string()).optional(),
   soNguoiToiDa: z.number().min(1, 'Số người tối đa phải lớn hơn 0').max(10, 'Số người tối đa không được quá 10'),
+  // Chỉ đặt tay được "Bảo trì" / "Trống"; "Đang thuê" / "Đã đặt" do hợp đồng quyết định (bị bỏ qua)
+  trangThai: z.enum(['trong', 'daDat', 'dangThue', 'baoTri']).optional(),
 });
 
 export async function GET(
@@ -94,10 +97,24 @@ export async function PUT(
       );
     }
 
+    // Trạng thái đặt tay: chỉ nhận "Bảo trì" / "Trống"
+    const { trangThai: trangThaiYeuCau, ...duLieuPhong } = validatedData;
+    const datTay = trangThaiYeuCau === 'baoTri' || trangThaiYeuCau === 'trong' ? trangThaiYeuCau : undefined;
+    if (datTay === 'baoTri') {
+      const dangCoHopDong = await HopDong.exists({ phong: id, trangThai: 'hoatDong' });
+      if (dangCoHopDong) {
+        return NextResponse.json(
+          { message: 'Phòng đang có hợp đồng hoạt động — không thể chuyển sang Bảo trì' },
+          { status: 400 }
+        );
+      }
+    }
+
     const phong = await Phong.findByIdAndUpdate(
       id,
       {
-        ...validatedData,
+        ...duLieuPhong,
+        ...(datTay ? { trangThai: datTay } : {}),
         anhPhong: validatedData.anhPhong || [],
         tienNghi: validatedData.tienNghi || [],
         // Trạng thái sẽ được cập nhật tự động dựa trên hợp đồng

@@ -88,7 +88,11 @@ export async function calculateKhachThueStatus(khachThueId: string): Promise<'da
 export async function updatePhongStatus(phongId: string): Promise<void> {
   try {
     const newStatus = await calculatePhongStatus(phongId);
-    await Phong.findByIdAndUpdate(phongId, { trangThai: newStatus });
+    // Phòng đang "Bảo trì" mà không có hợp đồng thì giữ nguyên — chỉ hợp đồng mới ghi đè bảo trì
+    await Phong.updateOne(
+      { _id: phongId, ...(newStatus === 'trong' ? { trangThai: { $ne: 'baoTri' } } : {}) },
+      { $set: { trangThai: newStatus } },
+    );
   } catch (error) {
     console.error('Error updating phong status:', error);
   }
