@@ -618,6 +618,8 @@ export default function ThemMoiHoaDonPage() {
                     value={formData.phiDichVu}
                     onChange={(phiDichVu) => setFormData(prev => ({ ...prev, phiDichVu }))}
                     tienPhongLeGoiY={xemTruoc?.tienPhongLeGoiY}
+                    giaThueGoiY={hopDongList.find(hd => hd._id === formData.hopDong)?.giaThue}
+                    ngayThuGoiY={hopDongList.find(hd => hd._id === formData.hopDong)?.ngayThanhToan}
                   />
                 </div>
                 <div className="space-y-2">

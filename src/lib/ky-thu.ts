@@ -164,3 +164,23 @@ export function fmtNgay(d: NgayInput): string {
 export function tenTienPhongLe(tuNgay: NgayInput, denNgay: NgayInput, soNgay: number): string {
   return `Tiền phòng lẻ (${fmtNgayThang(tuNgay)} – ${fmtNgayThang(congNgay(denNgay, -1))}, ${soNgay} ngày)`;
 }
+
+/** "YYYY-MM-DD" (giá trị của input type=date) → Date 00:00 giờ VN; rỗng / sai định dạng → null */
+export function docNgayInput(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? taoNgayVN(Number(m[1]), Number(m[2]), Number(m[3])) : null;
+}
+
+/**
+ * Khoản thu theo số ngày ở: từ ngày chuyển vào đến ngày thu kế tiếp (không tính ngày thu).
+ * Số tiền = tiền 1 tháng × số ngày / số ngày của kỳ thu — cùng công thức tiền phòng lẻ.
+ * Chuyển vào đúng ngày thu → trọn một kỳ.
+ */
+export function tinhTheoNgayChuyenVao(ngayChuyenVao: string, ngayThuHangThang: number, tienMotThang: number) {
+  const tuNgay = docNgayInput(ngayChuyenVao);
+  if (!tuNgay || ngayThuHangThang < 1 || ngayThuHangThang > 31 || tienMotThang < 0) return null;
+  const ky = kyThuChua(ngayThuHangThang, tuNgay);
+  const soNgay = soNgayGiua(tuNgay, ky.ketThuc);
+  const soTien = Math.round((tienMotThang * soNgay) / ky.soNgay);
+  return { tuNgay, denNgay: ky.ketThuc, soNgay, soNgayCuaKy: ky.soNgay, soTien };
+}

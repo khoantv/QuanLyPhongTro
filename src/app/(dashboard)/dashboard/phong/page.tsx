@@ -830,17 +830,30 @@ function PhongForm({
       const url = phong ? `/api/phong/${phong._id}` : '/api/phong';
       const method = phong ? 'PUT' : 'POST';
 
+      // Đổi giá phòng đang có hợp đồng: hỏi có áp dụng cho hợp đồng hiện tại không
+      // (hóa đơn tính tiền phòng theo giá trong hợp đồng, không theo giá phòng)
+      const capNhatGiaHopDong =
+        !!phong?.hopDongHienTai &&
+        Number(formData.giaThue) !== Number(phong.giaThue) &&
+        confirm(
+          `Phòng ${phong.maPhong} đang có hợp đồng.\n\n` +
+          `Áp dụng giá thuê mới ${Number(formData.giaThue).toLocaleString('vi-VN')}đ cho hợp đồng hiện tại? ` +
+          `Hóa đơn từ kỳ tới sẽ tính theo giá mới.\n\n` +
+          `OK = cập nhật cả hợp đồng · Hủy = chỉ đổi giá phòng (áp dụng cho hợp đồng sau)`
+        );
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, capNhatGiaHopDong }),
       });
 
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
+          if (result.soHopDongCapNhatGia) toast.success(result.message);
           onSuccess();
         } else {
           toast.error(result.message || 'Có lỗi xảy ra');

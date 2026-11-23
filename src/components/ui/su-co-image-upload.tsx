@@ -4,8 +4,10 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Upload, X, Image as ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Loader2, AlertTriangle, ClipboardPaste } from 'lucide-react';
 import { toast } from 'sonner';
+import { nenAnh } from '@/lib/nen-anh';
+import { useDanAnh } from '@/hooks/use-dan-anh';
 
 interface SuCoImageUploadProps {
   images: string[];
@@ -23,11 +25,8 @@ export function SuCoImageUpload({
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const newFiles = Array.from(files);
+  const uploadFiles = async (newFiles: File[]) => {
+    if (newFiles.length === 0) return;
     
     // Kiểm tra số lượng ảnh
     if (images.length + newFiles.length > maxImages) {
@@ -47,7 +46,7 @@ export function SuCoImageUpload({
     try {
       const uploadPromises = newFiles.map(async (file) => {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', await nenAnh(file)); // thu nhỏ + nén trước khi gửi
 
         const response = await fetch('/api/upload', {
           method: 'POST',
@@ -79,6 +78,15 @@ export function SuCoImageUpload({
     }
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    await uploadFiles(Array.from(event.target.files ?? []));
+  };
+
+  // Dán ảnh từ clipboard (Ctrl/⌘+V hoặc nút "Dán ảnh")
+  const { ref, danTuNut } = useDanAnh((files) => {
+    if (!uploading) void uploadFiles(files);
+  });
+
   const removeImage = (index: number) => {
     const newImages = images.filter((_, i) => i !== index);
     onImagesChange(newImages);
@@ -86,7 +94,7 @@ export function SuCoImageUpload({
   };
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div ref={ref} className={`space-y-4 ${className}`}>
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-5 w-5 text-orange-600" />
         <h3 className="text-lg font-medium">Ảnh sự cố</h3>
@@ -124,6 +132,16 @@ export function SuCoImageUpload({
               Thêm ảnh
             </>
           )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={danTuNut}
+          disabled={uploading || images.length >= maxImages}
+        >
+          <ClipboardPaste className="h-4 w-4 mr-2" />
+          Dán ảnh
         </Button>
         {images.length >= maxImages && (
           <span className="text-sm text-gray-500">
@@ -166,7 +184,10 @@ export function SuCoImageUpload({
               Chưa có ảnh sự cố nào
             </p>
             <p className="text-xs text-gray-400 text-center mt-1">
-              Click "Thêm ảnh" để upload ảnh minh họa sự cố
+              Click &quot;Thêm ảnh&quot; để upload ảnh minh họa sự cố
+            </p>
+            <p className="text-xs text-gray-400 text-center">
+              Hoặc nhấn Ctrl/⌘+V để dán ảnh từ clipboard
             </p>
           </CardContent>
         </Card>

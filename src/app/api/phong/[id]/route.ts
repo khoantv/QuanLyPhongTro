@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import Phong from '@/models/Phong';
 import ToaNha from '@/models/ToaNha';
+import HopDong from '@/models/HopDong';
 import { updatePhongStatus } from '@/lib/status-utils';
 import { z } from 'zod';
 
@@ -111,6 +112,17 @@ export async function PUT(
       );
     }
 
+    // Áp dụng giá thuê mới cho hợp đồng đang hoạt động của phòng (khi người dùng đồng ý).
+    // Hóa đơn tính tiền phòng theo giá trong hợp đồng, không theo giá phòng.
+    let soHopDongCapNhatGia = 0;
+    if (body?.capNhatGiaHopDong === true) {
+      const kq = await HopDong.updateMany(
+        { phong: id, trangThai: 'hoatDong', giaThue: { $ne: validatedData.giaThue } },
+        { $set: { giaThue: validatedData.giaThue } }
+      );
+      soHopDongCapNhatGia = kq.modifiedCount;
+    }
+
     // Cập nhật trạng thái dựa trên hợp đồng sau khi cập nhật phòng
     await updatePhongStatus(id);
 
@@ -121,7 +133,10 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       data: updatedPhong,
-      message: 'Phòng đã được cập nhật thành công',
+      soHopDongCapNhatGia,
+      message: soHopDongCapNhatGia
+        ? 'Đã cập nhật phòng và giá thuê của hợp đồng đang hoạt động'
+        : 'Phòng đã được cập nhật thành công',
     });
 
   } catch (error) {

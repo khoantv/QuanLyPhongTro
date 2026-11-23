@@ -2,8 +2,10 @@
 
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Loader2, ClipboardPaste } from 'lucide-react';
 import { toast } from 'sonner';
+import { nenAnh } from '@/lib/nen-anh';
+import { useDanAnh } from '@/hooks/use-dan-anh';
 
 interface ImageUploadProps {
   imageUrl: string;
@@ -11,23 +13,22 @@ interface ImageUploadProps {
   className?: string;
   label?: string;
   placeholder?: string;
+  /** Cho phép dán ảnh từ clipboard (Ctrl/⌘+V hoặc nút "Dán ảnh"). Mặc định bật. */
+  enablePaste?: boolean;
 }
 
-export function ImageUpload({ 
-  imageUrl, 
-  onImageChange, 
+export function ImageUpload({
+  imageUrl,
+  onImageChange,
   className = '',
   label = 'Ảnh',
-  placeholder = 'Chọn ảnh'
+  placeholder = 'Chọn ảnh',
+  enablePaste = true,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
+  const uploadFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Vui lòng chọn file ảnh');
       return;
@@ -37,7 +38,7 @@ export function ImageUpload({
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', await nenAnh(file)); // thu nhỏ + nén trước khi gửi
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -49,8 +50,10 @@ export function ImageUpload({
       }
 
       const result = await response.json();
-      if (result.success && result.data.url) {
-        onImageChange(result.data.url);
+      // /api/upload trả link Cloudinary trong secure_url
+      const url: string | undefined = result?.data?.secure_url || result?.data?.url;
+      if (result.success && url) {
+        onImageChange(url);
         toast.success('Upload ảnh thành công');
       } else {
         throw new Error('Upload failed');
@@ -67,22 +70,33 @@ export function ImageUpload({
     }
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    await uploadFile(files[0]);
+  };
+
+  // Dán ảnh: ô chỉ nhận một ảnh → lấy ảnh đầu tiên (thay ảnh cũ nếu có)
+  const { ref, danTuNut } = useDanAnh((files) => {
+    if (!uploading && files[0]) void uploadFile(files[0]);
+  }, enablePaste);
+
   const handleRemove = () => {
     onImageChange('');
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div ref={ref} className={`space-y-2 ${className}`}>
       <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
         {label}
       </label>
-      
+
       <div className="space-y-2">
         {imageUrl ? (
           <div className="relative">
-            <img 
-              src={imageUrl} 
-              alt="Uploaded image" 
+            <img
+              src={imageUrl}
+              alt="Uploaded image"
               className="w-full h-48 object-cover rounded-lg border"
             />
             <Button
@@ -96,7 +110,7 @@ export function ImageUpload({
             </Button>
           </div>
         ) : (
-          <div 
+          <div
             className="w-full h-48 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors"
             onClick={() => inputRef.current?.click()}
           >
@@ -109,12 +123,14 @@ export function ImageUpload({
               <>
                 <ImageIcon className="h-8 w-8 text-gray-400" />
                 <p className="mt-2 text-sm text-gray-500">{placeholder}</p>
-                <p className="text-xs text-gray-400">Click để chọn ảnh</p>
+                <p className="text-xs text-gray-400">
+                  {enablePaste ? 'Click để chọn ảnh hoặc nhấn Ctrl/⌘+V để dán' : 'Click để chọn ảnh'}
+                </p>
               </>
             )}
           </div>
         )}
-        
+
         <input
           ref={inputRef}
           type="file"
@@ -122,17 +138,25 @@ export function ImageUpload({
           onChange={handleFileSelect}
           className="hidden"
         />
-        
+
         {!imageUrl && !uploading && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => inputRef.current?.click()}
-            className="w-full"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Chọn ảnh
-          </Button>
+          <div className={enablePaste ? 'grid grid-cols-2 gap-2' : ''}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => inputRef.current?.click()}
+              className="w-full"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Chọn ảnh
+            </Button>
+            {enablePaste && (
+              <Button type="button" variant="outline" onClick={danTuNut} className="w-full">
+                <ClipboardPaste className="h-4 w-4 mr-2" />
+                Dán ảnh
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>

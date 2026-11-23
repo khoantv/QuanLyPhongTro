@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  tinhTheoNgayChuyenVao,
   fmtNgay, kyThuChua, kyThuCuaThang, lamTron1000, ngayThu, soNgayGiua, taoNgayVN, tenTienPhongLe, tienPhongTheoNgay,
 } from './ky-thu';
 
@@ -82,4 +83,40 @@ describe('làm tròn 1.000đ', () => {
     [4_300, 4_000], [4_500, 4_000], [4_600, 5_000], [4_800, 5_000], [4_000, 4_000],
     [1_199_500, 1_199_000], [2_009_600, 2_010_000], [-445_645, -446_000],
   ])('%i → %i', (vao, ra) => expect(lamTron1000(vao)).toBe(ra));
+});
+
+describe('tính theo ngày chuyển vào', () => {
+  it('vào 05/11, thu ngày 21 → 05/11–20/11 là 16 ngày của kỳ 31 ngày', () => {
+    const kq = tinhTheoNgayChuyenVao('2026-11-05', 21, 900000)!;
+    expect(kq.soNgay).toBe(16);
+    expect(kq.soNgayCuaKy).toBe(31); // kỳ 21/10 → 21/11 có 31 ngày
+    expect(kq.soTien).toBe(Math.round((900000 * 16) / 31));
+    expect(fmtNgay(kq.denNgay)).toBe('21/11/2026');
+  });
+
+  it('vào sau ngày thu → tính đến ngày thu tháng sau', () => {
+    const kq = tinhTheoNgayChuyenVao('2026-11-25', 21, 900000)!;
+    expect(fmtNgay(kq.denNgay)).toBe('21/12/2026');
+    expect(kq.soNgay).toBe(26);
+    expect(kq.soNgayCuaKy).toBe(30);
+    expect(kq.soTien).toBe(780000);
+  });
+
+  it('vào đúng ngày thu → trọn một kỳ', () => {
+    const kq = tinhTheoNgayChuyenVao('2026-11-21', 21, 900000)!;
+    expect(kq.soNgay).toBe(kq.soNgayCuaKy);
+    expect(kq.soTien).toBe(900000);
+  });
+
+  it('ngày thu chỉnh được (ngày 5)', () => {
+    const kq = tinhTheoNgayChuyenVao('2026-11-20', 5, 600000)!;
+    expect(fmtNgay(kq.denNgay)).toBe('05/12/2026');
+    expect(kq.soNgay).toBe(15);
+    expect(kq.soTien).toBe(300000);
+  });
+
+  it('dữ liệu không hợp lệ → null', () => {
+    expect(tinhTheoNgayChuyenVao('', 21, 900000)).toBeNull();
+    expect(tinhTheoNgayChuyenVao('2026-11-05', 0, 900000)).toBeNull();
+  });
 });

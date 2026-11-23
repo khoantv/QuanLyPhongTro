@@ -85,7 +85,7 @@ export function chuanHoaPhi(list: Array<Partial<DongPhi>>): DongPhi[] {
       const gia = soNguyen(p.gia);
       if (gia < 0) throw new LapHoaDonError(`Số tiền của "${p.ten}" phải ≥ 0 — dùng mục Giảm trừ cho khoản bớt`);
       const loai: LoaiPhiHoaDon = p.loai === 'tienPhongLe' || p.loai === 'khac' ? p.loai : 'dichVu';
-      return { ten: p.ten!.trim(), gia, loai, chiTiet: loai === 'tienPhongLe' ? (p.chiTiet ?? null) : null };
+      return { ten: p.ten!.trim(), gia, loai, chiTiet: loai !== 'dichVu' ? (p.chiTiet ?? null) : null };
     });
 }
 

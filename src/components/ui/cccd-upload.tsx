@@ -4,8 +4,12 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Upload, X, Image as ImageIcon, Loader2, CreditCard } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Loader2, CreditCard, ClipboardPaste } from 'lucide-react';
 import { toast } from 'sonner';
+import { nenAnh } from '@/lib/nen-anh';
+import { useDanAnh, docAnhTuClipboard } from '@/hooks/use-dan-anh';
+
+type MatCCCD = 'matTruoc' | 'matSau';
 
 interface CCCDUploadProps {
   anhCCCD: {
@@ -28,11 +32,7 @@ export function CCCDUpload({
   const matTruocInputRef = useRef<HTMLInputElement>(null);
   const matSauInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, type: 'matTruoc' | 'matSau') => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
+  const uploadFile = async (file: File, type: MatCCCD) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Vui lòng chọn file ảnh');
       return;
@@ -42,7 +42,7 @@ export function CCCDUpload({
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', await nenAnh(file)); // thu nhỏ + nén trước khi gửi
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -76,6 +76,24 @@ export function CCCDUpload({
     }
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, type: MatCCCD) => {
+    const file = event.target.files?.[0];
+    if (file) await uploadFile(file, type);
+  };
+
+  // Dán ảnh (Ctrl/⌘+V): vào mặt đang rê chuột / vừa bấm; chưa chọn thì vào mặt còn trống trước
+  const matDangChon = useRef<MatCCCD | null>(null);
+  const chonMatDeDan = (): MatCCCD =>
+    matDangChon.current ?? (!anhCCCD.matTruoc ? 'matTruoc' : !anhCCCD.matSau ? 'matSau' : 'matTruoc');
+  const { ref } = useDanAnh((files) => {
+    const type = chonMatDeDan();
+    if (files[0] && !uploading[type]) void uploadFile(files[0], type);
+  });
+  const danVaoMat = async (type: MatCCCD) => {
+    const [file] = await docAnhTuClipboard();
+    if (file) await uploadFile(file, type);
+  };
+
   const removeImage = (type: 'matTruoc' | 'matSau') => {
     onCCCDChange({
       ...anhCCCD,
@@ -85,7 +103,7 @@ export function CCCDUpload({
   };
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div ref={ref} className={`space-y-6 ${className}`}>
       <div className="flex items-center gap-2 mb-4">
         <CreditCard className="h-5 w-5 text-blue-600" />
         <h3 className="text-lg font-medium">Ảnh CCCD</h3>
@@ -93,7 +111,7 @@ export function CCCDUpload({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Mặt trước */}
-        <div className="space-y-3">
+        <div className="space-y-3" onPointerEnter={() => (matDangChon.current = 'matTruoc')} onPointerDown={() => (matDangChon.current = 'matTruoc')}>
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-gray-700">
               Mặt trước CCCD
@@ -106,6 +124,18 @@ export function CCCDUpload({
               className="hidden"
               disabled={uploading.matTruoc}
             />
+            <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => danVaoMat('matTruoc')}
+              disabled={uploading.matTruoc}
+              title="Dán ảnh từ clipboard (Ctrl/⌘+V)"
+            >
+              <ClipboardPaste className="h-4 w-4 mr-2" />
+              Dán
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -125,6 +155,7 @@ export function CCCDUpload({
                 </>
               )}
             </Button>
+            </div>
           </div>
 
           {anhCCCD.matTruoc ? (
@@ -161,7 +192,7 @@ export function CCCDUpload({
         </div>
 
         {/* Mặt sau */}
-        <div className="space-y-3">
+        <div className="space-y-3" onPointerEnter={() => (matDangChon.current = 'matSau')} onPointerDown={() => (matDangChon.current = 'matSau')}>
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-gray-700">
               Mặt sau CCCD
@@ -174,6 +205,18 @@ export function CCCDUpload({
               className="hidden"
               disabled={uploading.matSau}
             />
+            <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => danVaoMat('matSau')}
+              disabled={uploading.matSau}
+              title="Dán ảnh từ clipboard (Ctrl/⌘+V)"
+            >
+              <ClipboardPaste className="h-4 w-4 mr-2" />
+              Dán
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -193,6 +236,7 @@ export function CCCDUpload({
                 </>
               )}
             </Button>
+            </div>
           </div>
 
           {anhCCCD.matSau ? (
