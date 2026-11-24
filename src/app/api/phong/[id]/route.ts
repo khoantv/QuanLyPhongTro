@@ -6,7 +6,6 @@ import Phong from '@/models/Phong';
 import ToaNha from '@/models/ToaNha';
 import HopDong from '@/models/HopDong';
 import { updatePhongStatus } from '@/lib/status-utils';
-import HopDong from '@/models/HopDong';
 import { z } from 'zod';
 
 const phongSchema = z.object({
