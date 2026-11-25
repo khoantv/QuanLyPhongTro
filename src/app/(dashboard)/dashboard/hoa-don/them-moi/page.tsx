@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { HopDong, Phong, KhachThue, PhiDichVu, KhoanGiamTru } from '@/types';
 import { PhiDichVuEditor, GiamTruEditor, lamTron1000 } from '@/components/hoa-don/khoan-thu-editor';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { danhDauDuLieuThayDoi } from '@/hooks/use-cache';
 
@@ -69,7 +70,8 @@ interface XemTruoc {
   phiDichVu: PhiDichVu[];
   tienPhongLeGoiY: PhiDichVu | null;
   lamTron: boolean;
-  noKyTruoc: number;
+  noConLaiKyTruoc: number;
+  tienThuaKyTruoc: number;
   hanThanhToan: string;
   ghiChuMacDinh: string;
   hopDong: { giaDien: number; giaNuoc: number; maPhong: string };
@@ -114,6 +116,8 @@ export default function ThemMoiHoaDonPage() {
     hanThanhToan: '',
     ghiChu: '',
   });
+  // Khấu trừ tiền thừa kỳ trước — mặc định không trừ
+  const [khauTru, setKhauTru] = useState(false);
   const [thayDongHo, setThayDongHo] = useState({ dien: false, soDien: 0, nuoc: false, soNuoc: 0 });
 
   // Tự động sinh mã hóa đơn
@@ -181,6 +185,7 @@ export default function ThemMoiHoaDonPage() {
         const bt: XemTruoc = j.data;
         setLoiXemTruoc(null);
         setXemTruoc(bt);
+        setKhauTru(false);
         setThayDongHo({ dien: false, soDien: 0, nuoc: false, soNuoc: 0 });
         setFormData(prev => ({
           ...prev,
@@ -212,7 +217,9 @@ export default function ThemMoiHoaDonPage() {
   const tongGiamTru = formData.khoanGiamTru.reduce((s, g) => s + (g.soTien || 0), 0);
   const tongTruocLamTron = formData.tienPhong + tienDien + tienNuoc + tongPhi - tongGiamTru;
   const tongTien = xemTruoc?.lamTron ? lamTron1000(tongTruocLamTron) : tongTruocLamTron;
-  const noKyTruoc = xemTruoc?.noKyTruoc ?? 0;
+  const noConLaiKyTruoc = xemTruoc?.noConLaiKyTruoc ?? 0;
+  const tienThuaKyTruoc = xemTruoc?.tienThuaKyTruoc ?? 0;
+  const noKyTruoc = noConLaiKyTruoc - (khauTru ? tienThuaKyTruoc : 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,6 +251,7 @@ export default function ThemMoiHoaDonPage() {
           khoanGiamTru: formData.khoanGiamTru,
           hanThanhToan: formData.hanThanhToan,
           ghiChu: formData.ghiChu,
+          khauTruTienThua: khauTru,
         }),
       });
       const result = await response.json();
@@ -562,8 +570,17 @@ export default function ThemMoiHoaDonPage() {
                     {xemTruoc.tienPhongLeGoiY && (
                       <div>➕ Có {xemTruoc.tienPhongLeGoiY.ten.replace('Tiền phòng lẻ ', 'tiền phòng lẻ ')}: {xemTruoc.tienPhongLeGoiY.gia.toLocaleString('vi-VN')}đ (xem tab Phí & khoản khác)</div>
                     )}
-                    {noKyTruoc !== 0 && (
-                      <div>{noKyTruoc > 0 ? '⚠️ Khách đang nợ' : '💚 Khách có tiền thừa'} {Math.abs(noKyTruoc).toLocaleString('vi-VN')}đ — sẽ hiện trên hóa đơn</div>
+                    {noConLaiKyTruoc > 0 && (
+                      <div>⚠️ Khách đang nợ {noConLaiKyTruoc.toLocaleString('vi-VN')}đ — sẽ hiện trên hóa đơn</div>
+                    )}
+                    {tienThuaKyTruoc > 0 && (
+                      <label className="flex items-start gap-2 cursor-pointer pt-1">
+                        <Checkbox checked={khauTru} onCheckedChange={(v) => setKhauTru(Boolean(v))} className="mt-0.5 bg-white" />
+                        <span>
+                          Khấu trừ tiền thừa kỳ trước <strong className="text-emerald-700">{tienThuaKyTruoc.toLocaleString('vi-VN')}đ</strong> vào hóa đơn này
+                          <span className="block text-xs text-muted-foreground">Không chọn: khách trả đủ tiền hóa đơn, tiền thừa vẫn giữ lại cho khách.</span>
+                        </span>
+                      </label>
                     )}
                   </div>
                 )}
@@ -656,6 +673,16 @@ export default function ThemMoiHoaDonPage() {
                     </>
                   )}
                 </div>
+
+                {tienThuaKyTruoc > 0 && (
+                      <label className="flex items-start gap-2 cursor-pointer rounded-lg border p-3 text-sm">
+                        <Checkbox checked={khauTru} onCheckedChange={(v) => setKhauTru(Boolean(v))} className="mt-0.5 bg-white" />
+                        <span>
+                          Khấu trừ tiền thừa kỳ trước <strong className="text-emerald-700">{tienThuaKyTruoc.toLocaleString('vi-VN')}đ</strong> vào hóa đơn này
+                          <span className="block text-xs text-muted-foreground">Không chọn: khách trả đủ tiền hóa đơn, tiền thừa vẫn giữ lại cho khách.</span>
+                        </span>
+                      </label>
+                    )}
 
                 <div className="space-y-2">
                   <Label htmlFor="ghiChu" className="text-sm">Ghi chú</Label>

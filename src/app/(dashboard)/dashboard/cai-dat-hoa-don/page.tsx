@@ -271,13 +271,14 @@ export default function CaiDatHoaDonPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="truKySau">Trừ vào kỳ sau</SelectItem>
-            <SelectItem value="khongTru">Không trừ (bỏ qua tiền thừa)</SelectItem>
+            <SelectItem value="truKySau">Giữ lại cho kỳ sau</SelectItem>
+            <SelectItem value="khongTru">Bỏ qua tiền thừa</SelectItem>
           </SelectContent>
         </Select>
         <p className="text-sm text-gray-600">
           Lựa chọn mặc định khi khách đóng nhiều hơn số đang nợ. Mỗi lần thu tiền vẫn có thể chọn lại.
-          Khi khách đóng trước (chưa có nợ), hệ thống luôn chọn sẵn &quot;Trừ vào kỳ sau&quot;.
+          Khi khách đóng trước (chưa có nợ), hệ thống luôn chọn sẵn &quot;Giữ lại cho kỳ sau&quot;.
+          Tiền giữ lại chỉ được trừ khi bạn chọn &quot;Khấu trừ tiền thừa kỳ trước&quot; lúc lập hóa đơn.
         </p>
       </div>
 

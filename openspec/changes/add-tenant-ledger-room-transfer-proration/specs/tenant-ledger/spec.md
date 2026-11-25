@@ -90,11 +90,6 @@ Hệ thống SHALL tính `daThanhToan`, `conLai`, `trangThai` của mọi hóa �
 - **WHEN** khách nợ hóa đơn tháng 10 còn 1.000đ, có hóa đơn tháng 11 1.400.000đ, rồi đóng 1.000.000đ
 - **THEN** hóa đơn tháng 10 `daThanhToan` đủ, `trangThai='daThanhToan'`; hóa đơn tháng 11 `daThanhToan=999.000`, `conLai=401.000`
 
-#### Scenario: Tiền thừa tự trừ vào hóa đơn sau
-
-- **WHEN** khách có số dư −500.000đ (đóng trước), sau đó hệ thống lập hóa đơn 1.400.000đ
-- **THEN** hóa đơn mới có `daThanhToan=500.000`, `conLai=900.000`, `trangThai='daThanhToanMotPhan'`
-
 #### Scenario: Quá hạn
 
 - **WHEN** hóa đơn có `conLai > 0` và `hanThanhToan` đã qua
@@ -104,6 +99,20 @@ Hệ thống SHALL tính `daThanhToan`, `conLai`, `trangThai` của mọi hóa �
 
 - **WHEN** admin hủy thanh toán đã phân bổ hết vào hóa đơn tháng 11
 - **THEN** hóa đơn tháng 11 trở về `chuaThanhToan` (hoặc `quaHan` nếu đã quá hạn)
+
+### Requirement: Chọn khấu trừ tiền thừa kỳ trước khi lập hóa đơn
+
+Khi lập hóa đơn cho khách đang có tiền thừa, người dùng SHALL chọn được có khấu trừ vào hóa đơn hay không (`HoaDon.khauTruTienThua`), mặc định KHÔNG khấu trừ. Không khấu trừ: hóa đơn chỉ nhận các khoản tiền ghi nhận sau khi lập, tiền thừa SHALL được giữ lại cho khách. Nợ kỳ trước luôn được tính. Hóa đơn cũ chưa có trường này SHALL được coi là có khấu trừ; lựa chọn đổi được ở form sửa.
+
+#### Scenario: Mặc định không khấu trừ
+
+- **WHEN** khách thừa 500đ và lập hóa đơn 1.369.500đ không chọn khấu trừ
+- **THEN** `noKyTruoc=0`, cần thanh toán 1.369.500đ, `daThanhToan=0`, `trangThai='chuaThanhToan'`, khách vẫn thừa 500đ
+
+#### Scenario: Chọn khấu trừ
+
+- **WHEN** cùng tình huống nhưng chọn khấu trừ
+- **THEN** `noKyTruoc=−500`, cần thanh toán 1.369.000đ, `tienThuaDaKhauTru=500`, `trangThai='chuaThanhToan'` (khấu trừ không tính là một lần thanh toán)
 
 ### Requirement: Nợ kỳ trước trên hóa đơn
 

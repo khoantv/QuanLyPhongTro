@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import connectToDatabase from '@/lib/mongodb';
 import GiaoDichCongNo from '@/models/GiaoDichCongNo';
 import KhachThue from '@/models/KhachThue';
-import { hoaDonMoCuaKhach, sapXepButToan } from '@/lib/cong-no';
+import { hoaDonMoCuaKhach, sapXepButToan, tinhCongNo } from '@/lib/cong-no';
 
 // GET /api/cong-no?khachThueId=...&hienDaHuy=1
 // Trả số dư hiện tại, lịch sử bút toán (kèm số dư lũy kế) và các hóa đơn còn nợ (cũ → mới).
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     if (!hienDaHuy) filter.daHuy = false;
 
     const raw = await GiaoDichCongNo.find(filter)
-      .populate('hoaDon', 'maHoaDon thang nam')
+      .populate('hoaDon', 'maHoaDon thang nam khauTruTienThua')
       .populate('phong', 'maPhong')
       .populate('thanhToan', 'phuongThuc xuLyTienThua')
       .populate('nguoiTao', 'ten email')
@@ -46,13 +46,15 @@ export async function GET(request: NextRequest) {
       return { ...b, soDuLuyKe: b.daHuy ? null : luyKe };
     });
 
-    const hoaDonMo = await hoaDonMoCuaKhach(khachThueId);
+    const [hoaDonMo, congNo] = await Promise.all([hoaDonMoCuaKhach(khachThueId), tinhCongNo(khachThueId)]);
 
     return NextResponse.json({
       success: true,
       data: {
         khachThue,
         soDu: luyKe,
+        noConLai: congNo.noConLai,
+        tienThua: congNo.tienThua,
         butToan: butToan.reverse(), // mới nhất trước
         hoaDonMo,
       },

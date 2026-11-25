@@ -6,6 +6,7 @@ import '@/models/KhachThue';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { lapHoaDonHangThang, capNhatHoaDon, xoaHoaDon, LapHoaDonError } from '@/lib/hoa-don/lap-hoa-don';
+import { tinhCongNo, tinhCongNoTruocHoaDon } from '@/lib/cong-no';
 import { guiZaloTuDong } from '@/lib/hoa-don/gui-zalo';
 
 
@@ -56,9 +57,27 @@ export async function GET(request: NextRequest) {
         hoaDonObj.chiSoNuocCuoiKy = hoaDonObj.chiSoNuocBanDau;
       }
 
+      // Tiền thừa khách có ngay trước hóa đơn này — để form sửa cho chọn có khấu trừ hay không
+      const truoc = await tinhCongNoTruocHoaDon(hoaDon);
+      const hoaDonId = String(hoaDon._id);
+      const khachId = String(hoaDon.khachThue?._id ?? hoaDon.khachThue);
+      // Đã nhận / phần khấu trừ của hóa đơn theo từng lựa chọn, để form xem trước
+      const phuongAn = async (khauTru: boolean) => {
+        const kq = await tinhCongNo(khachId, {}, { hoaDonId, khauTru });
+        return {
+          daThanhToan: Math.min(Math.max(0, hoaDon.tongTien), kq.daPhanBoTheoHoaDon.get(hoaDonId) ?? 0),
+          daKhauTru: kq.daKhauTruTheoHoaDon.get(hoaDonId) ?? 0,
+        };
+      };
+      const [coTru, khongTru] = await Promise.all([phuongAn(true), phuongAn(false)]);
       return NextResponse.json({
         success: true,
-        data: hoaDonObj
+        data: {
+          ...hoaDonObj,
+          tienThuaKyTruoc: truoc?.tienThua ?? 0,
+          noConLaiKyTruoc: truoc?.noConLai ?? 0,
+          phuongAnKhauTru: { coTru, khongTru },
+        }
       });
     }
 
@@ -151,6 +170,7 @@ export async function POST(request: NextRequest) {
       ghiChu: body.ghiChu ?? null,
       maHoaDon: body.maHoaDon ?? null,
       hinhThucThanhToan: body.hinhThucThanhToan ?? null,
+      khauTruTienThua: body.khauTruTienThua === true,
     }, session.user.id);
 
     if (hoaDon) guiZaloTuDong(hoaDon);
@@ -197,6 +217,7 @@ export async function PUT(request: NextRequest) {
       hanThanhToan: body.hanThanhToan || undefined,
       ghiChu: body.ghiChu,
       hinhThucThanhToan: body.hinhThucThanhToan,
+      khauTruTienThua: typeof body.khauTruTienThua === 'boolean' ? body.khauTruTienThua : undefined,
     }, session.user.id);
 
     return NextResponse.json({

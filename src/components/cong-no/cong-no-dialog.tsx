@@ -45,7 +45,7 @@ export function CongNoDialog({
   const [cheDo, setCheDo] = useState<CheDo>(cheDoBanDau);
   const [loading, setLoading] = useState(false);
   const [hienDaHuy, setHienDaHuy] = useState(false);
-  const [data, setData] = useState<{ soDu: number; butToan: GiaoDichCongNo[] } | null>(null);
+  const [data, setData] = useState<{ soDu: number; noConLai?: number; tienThua?: number; butToan: GiaoDichCongNo[] } | null>(null);
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
 
@@ -89,7 +89,7 @@ export function CongNoDialog({
             {tieuDe}{hoTen ? ` — ${hoTen}` : ''}
           </DialogTitle>
           <DialogDescription>
-            Số dư dương là khách đang nợ, âm là tiền thừa sẽ trừ vào hóa đơn sau.
+            Số dư dương là khách đang nợ, âm là tiền thừa (chọn khấu trừ khi lập hóa đơn).
           </DialogDescription>
         </DialogHeader>
 
@@ -114,7 +114,12 @@ export function CongNoDialog({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-md border p-3">
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">Số dư hiện tại</span>
-                {data ? <SoDuBadge soDu={data.soDu} className="text-sm" /> : <Loader2 className="h-4 w-4 animate-spin" />}
+                {!data ? <Loader2 className="h-4 w-4 animate-spin" /> : (data.noConLai ?? 0) > 0 && (data.tienThua ?? 0) > 0 ? (
+                  <>
+                    <SoDuBadge soDu={data.noConLai} className="text-sm" />
+                    <SoDuBadge soDu={-(data.tienThua ?? 0)} className="text-sm" />
+                  </>
+                ) : <SoDuBadge soDu={data.soDu} className="text-sm" />}
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => setCheDo('thuTien')}><Plus className="h-4 w-4 mr-1" />Thu tiền</Button>

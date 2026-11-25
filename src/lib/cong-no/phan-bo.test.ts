@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { phanBoFIFO, tinhTienThua, tinhTrangThaiHoaDon, xemTruocPhanBo, ButToanPhanBo } from './phan-bo';
+import { phanBoFIFO, tinhNoKyTruoc, tinhTienThua, tinhTrangThaiHoaDon, xemTruocPhanBo, ButToanPhanBo } from './phan-bo';
 
 const d = (s: string) => new Date(s);
 let seq = 0;
@@ -86,10 +86,56 @@ describe('tinhTrangThaiHoaDon', () => {
 });
 
 describe('tinhTienThua', () => {
-  it('chỉ phần vượt quá số nợ, tối đa bằng số tiền thu', () => {
-    expect(tinhTienThua(1_100_000, -16_000)).toBe(16_000);
-    expect(tinhTienThua(1_000_000, 1_000)).toBe(0);
-    expect(tinhTienThua(500_000, -800_000)).toBe(500_000); // đã có tiền thừa từ trước
+  it('phần thừa do chính thanh toán tạo ra, tối đa bằng số tiền thu', () => {
+    expect(tinhTienThua(1_100_000, 16_000, 0)).toBe(16_000);
+    expect(tinhTienThua(1_000_000, 0, 0)).toBe(0);
+    expect(tinhTienThua(500_000, 800_000, 300_000)).toBe(500_000); // đã có tiền thừa từ trước
+    expect(tinhTienThua(1_370_500, 1_500, 500)).toBe(1_000); // 500đ giữ lại không bị tính vào
+  });
+});
+
+describe('không khấu trừ tiền thừa kỳ trước (phòng 22)', () => {
+  const T10 = bt(1_409_500, '2026-10-21', 'T10');
+  const thuT10 = bt(-1_410_000, '2026-10-22');
+  const T11 = bt(1_369_500, '2026-11-21', 'T11');
+  const T11Khong = { ...T11, khongKhauTru: true };
+
+  it('không trừ: T11 chưa được trả đồng nào, 500đ vẫn là tiền thừa của khách', () => {
+    const kq = phanBoFIFO([T10, thuT10, T11Khong]);
+    expect(kq.daPhanBoTheoHoaDon.get('T11')).toBe(0);
+    expect(kq.tienThua).toBe(500);
+    expect(kq.noConLai).toBe(1_369_500);
+    expect(kq.soDu).toBe(1_369_000);
+    expect(tinhTrangThaiHoaDon(1_369_500, 0, '2099-01-01').trangThai).toBe('chuaThanhToan');
+  });
+
+  it('không trừ: tiền thu sau khi lập T11 vẫn trả cho T11, tiền thừa giữ nguyên', () => {
+    const kq = phanBoFIFO([T10, thuT10, T11Khong, bt(-1_369_500, '2026-11-22')]);
+    expect(kq.daPhanBoTheoHoaDon.get('T11')).toBe(1_369_500);
+    expect(kq.tienThua).toBe(500);
+    expect(kq.noConLai).toBe(0);
+  });
+
+  it('không trừ T11 rồi trừ T12: 500đ được dùng cho T12', () => {
+    const kq = phanBoFIFO([T10, thuT10, T11Khong, bt(-1_369_500, '2026-11-22'), bt(1_000_000, '2026-12-21', 'T12')]);
+    expect(kq.daPhanBoTheoHoaDon.get('T12')).toBe(500);
+    expect(kq.daKhauTruTheoHoaDon.get('T12')).toBe(500);
+    expect(kq.tienThua).toBe(0);
+  });
+
+  it('có trừ: 500đ là khấu trừ, không phải "thanh toán một phần"', () => {
+    const kq = phanBoFIFO([T10, thuT10, T11]);
+    expect(kq.daPhanBoTheoHoaDon.get('T11')).toBe(500);
+    expect(kq.daKhauTruTheoHoaDon.get('T11')).toBe(500);
+    expect(kq.daKhauTruTheoHoaDon.get('T10') ?? 0).toBe(0);
+    expect(tinhTrangThaiHoaDon(1_369_500, 500, '2099-01-01', new Date(), 500)).toEqual({ conLai: 1_369_000, trangThai: 'chuaThanhToan' });
+  });
+
+  it('nợ kỳ trước luôn được tính dù không khấu trừ', () => {
+    const truoc = phanBoFIFO([bt(1_111_000, '2026-10-21', 'A'), bt(-1_110_000, '2026-10-22')]);
+    expect(tinhNoKyTruoc(truoc, false)).toBe(1_000);
+    expect(tinhNoKyTruoc(phanBoFIFO([T10, thuT10]), false)).toBe(0);
+    expect(tinhNoKyTruoc(phanBoFIFO([T10, thuT10]), true)).toBe(-500);
   });
 });
 

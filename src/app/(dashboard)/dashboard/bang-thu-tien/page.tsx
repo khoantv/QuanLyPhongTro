@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Download, FileText, Loader2, RefreshCw, Save, Search, Wallet } from 'lucide-react';
+import { Download, FileText, Loader2, Pencil, RefreshCw, Save, Search, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,10 +42,20 @@ export default function BangThuTienPage() {
   const [chon, setChon] = useState<Record<string, boolean>>({});
   const [dangLuu, setDangLuu] = useState(false);
   const [dangLap, setDangLap] = useState(false);
+  // Khấu trừ tiền thừa kỳ trước khi lập hóa đơn hàng loạt — mặc định không trừ
+  const [khauTru, setKhauTru] = useState(false);
   const [thuTien, setThuTien] = useState<DongBangThuTien | null>(null);
 
   useEffect(() => {
     document.title = 'Bảng thu tiền tháng';
+    // Quay lại từ form sửa hóa đơn: giữ đúng tháng đang xem
+    const sp = new URLSearchParams(window.location.search);
+    const t = Number(sp.get('thang'));
+    const n = Number(sp.get('nam'));
+    if (Number.isInteger(t) && t >= 1 && t <= 12 && Number.isInteger(n) && n >= 2020) {
+      setThang(t);
+      setNam(n);
+    }
     fetch('/api/toa-nha?limit=10000')
       .then((r) => r.json())
       .then((r) => {
@@ -146,7 +156,7 @@ export default function BangThuTienPage() {
       const res = await fetch('/api/bang-thu-tien/lap-hoa-don', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thang, nam, hopDongIds: hopDongChon }),
+        body: JSON.stringify({ thang, nam, hopDongIds: hopDongChon, khauTruTienThua: khauTru }),
       });
       const r = await res.json();
       if (!res.ok || !r.success) return toast.error(r.message || 'Không lập được hóa đơn');
@@ -240,10 +250,14 @@ export default function BangThuTienPage() {
           <div>
             <CardTitle className="text-base md:text-lg">{bang?.toaNha?.tenToaNha ?? '—'} · Tháng {thang}/{nam}</CardTitle>
             <CardDescription className="text-xs">
-              Xanh: đã đủ · Vàng: đóng một phần · Đỏ: quá hạn chưa đóng. Còn thiếu âm = khách đóng thừa (trừ kỳ sau).
+              Xanh: đã đủ · Vàng: đóng một phần · Đỏ: quá hạn chưa đóng. Còn thiếu âm = khách đóng thừa.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
+            <label className="flex items-center gap-2 text-xs cursor-pointer" title="Không chọn: tiền thừa được giữ lại cho khách, không trừ vào hóa đơn mới">
+              <Checkbox checked={khauTru} onCheckedChange={(v) => setKhauTru(Boolean(v))} />
+              Khấu trừ tiền thừa kỳ trước
+            </label>
             <Button size="sm" variant="outline" onClick={luuChiSo} disabled={!daSuaChiSo || dangLuu}>
               {dangLuu ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}Lưu chỉ số
             </Button>
@@ -315,9 +329,9 @@ export default function BangThuTienPage() {
                           {d.loai === 'trong' ? '' : vnd(d.tienPhong)}{d.tienPhongLe ? <span className="text-amber-600">*</span> : null}
                         </td>
                         <td className={cn(td, 'text-right')}>{d.loai === 'trong' ? '' : vnd(d.phiDichVu)}</td>
-                        <td className={cn(td, 'text-right', d.noKyTruoc > 0 && 'text-red-600', d.noKyTruoc < 0 && 'text-emerald-700')}>{d.noKyTruoc ? vnd(d.noKyTruoc) : ''}</td>
+                        <td className={cn(td, 'text-right', d.noKyTruoc > 0 && 'text-red-600', d.noKyTruoc < 0 && 'text-emerald-700')}>{d.noKyTruoc ? vnd(d.noKyTruoc) : ''}{d.tienThuaKyTruoc > 0 && <div className="text-[10px] text-emerald-700">Thừa {vnd(d.tienThuaKyTruoc)} ({khauTru ? 'sẽ trừ' : 'không trừ'})</div>}</td>
                         <td className={cn(td, 'text-right font-semibold', d.loai === 'chuaLap' && 'italic text-muted-foreground')} title={d.loai === 'chuaLap' ? 'Dự kiến — chưa lập hóa đơn' : undefined}>
-                          {d.loai === 'trong' || d.trangThai === 'chuaDenKy' ? '' : vnd(d.canDong)}
+                          {d.loai === 'trong' || d.trangThai === 'chuaDenKy' ? '' : vnd(d.canDong - (khauTru ? d.tienThuaKyTruoc : 0))}
                         </td>
                         <td className={cn(td, 'text-right font-semibold', mau)}>{coTien ? vnd(d.daDong) : ''}</td>
                         <td className={cn(td, 'text-right font-semibold', mau)}>
@@ -331,6 +345,13 @@ export default function BangThuTienPage() {
                             {d.khachThueId && d.loai !== 'trong' && (
                               <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setThuTien(d)} title="Thu tiền">
                                 <Wallet className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {d.hoaDonId && (
+                              <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Chỉnh sửa hóa đơn">
+                                <Link href={`/dashboard/hoa-don/${d.hoaDonId}?ve=bang-thu-tien`} aria-label={`Chỉnh sửa hóa đơn ${d.maHoaDon}`}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Link>
                               </Button>
                             )}
                             {d.hoaDonId && (

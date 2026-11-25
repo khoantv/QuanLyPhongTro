@@ -292,6 +292,9 @@ export interface HoaDon {
   noKyTruoc?: number;
   /** tongTien + noKyTruoc */
   tongCanThanhToan?: number;
+  /** false = không trừ tiền thừa kỳ trước; bỏ trống (hóa đơn cũ) = có trừ */
+  khauTruTienThua?: boolean;
+  tienThuaDaKhauTru?: number;
   /** Chỉ có từ API hóa đơn công khai: còn phải trả tính cả nợ kỳ trước (theo sổ công nợ) */
   tongConLai?: number;
   khoanGiamTru?: KhoanGiamTru[];
@@ -451,7 +454,7 @@ export interface GiaoDichCongNo {
   loai: LoaiGiaoDichCongNo;
   soTien: number;
   ngayGhiNhan: string;
-  hoaDon?: string | { _id: string; maHoaDon: string; thang: number; nam: number } | null;
+  hoaDon?: string | { _id: string; maHoaDon: string; thang: number; nam: number; khauTruTienThua?: boolean } | null;
   thanhToan?: string | { _id: string; phuongThuc: string; xuLyTienThua?: XuLyTienThua | null } | null;
   moTa: string;
   daHuy: boolean;

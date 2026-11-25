@@ -859,7 +859,7 @@ export default function HoaDonPage() {
                       </div>
                       <div>
                         <span className="text-gray-500">Đã thanh toán:</span>
-                        <p className="font-semibold text-green-600">{formatCurrency(hoaDon.daThanhToan)}</p>
+                        <p className="font-semibold text-green-600">{formatCurrency(hoaDon.daThanhToan - (hoaDon.tienThuaDaKhauTru ?? 0))}</p>
                       </div>
                       <div className="col-span-2">
                         <span className="text-gray-500">Còn lại:</span>
@@ -1048,7 +1048,7 @@ export default function HoaDonPage() {
                 )}
                 <div className="flex justify-between text-xs md:text-sm">
                   <span>Đã thanh toán:</span>
-                  <span className="text-green-600">{formatCurrency(viewingHoaDon.daThanhToan)}</span>
+                  <span className="text-green-600">{formatCurrency(viewingHoaDon.daThanhToan - (viewingHoaDon.tienThuaDaKhauTru ?? 0))}</span>
                 </div>
                 <div className="flex justify-between text-xs md:text-sm">
                   <span>Còn lại:</span>

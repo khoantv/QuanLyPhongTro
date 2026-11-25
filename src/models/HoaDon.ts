@@ -36,6 +36,10 @@ export interface IHoaDon extends Document {
   conLai: number;
   /** Số dư công nợ của khách ngay trước khi ghi hóa đơn này (dương = nợ, âm = tiền thừa). */
   noKyTruoc: number;
+  /** false = không trừ tiền thừa kỳ trước; bỏ trống (hóa đơn cũ) = có trừ */
+  khauTruTienThua?: boolean;
+  /** Phần tiền thừa kỳ trước đã trừ vào hóa đơn (nằm trong daThanhToan, không phải lần thu tiền) */
+  tienThuaDaKhauTru: number;
   /** tongTien + noKyTruoc */
   tongCanThanhToan: number;
   trangThai: 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan';
@@ -202,6 +206,8 @@ const HoaDonSchema = new Schema<IHoaDon>({
     required: [true, 'Còn lại là bắt buộc'],
     min: [0, 'Còn lại phải lớn hơn hoặc bằng 0']
   },
+  khauTruTienThua: { type: Boolean },
+  tienThuaDaKhauTru: { type: Number, default: 0, min: 0 },
   noKyTruoc: {
     type: Number,
     default: 0
@@ -258,7 +264,7 @@ HoaDonSchema.pre('save', function(next) {
   
   if (this.conLai <= 0) {
     this.trangThai = 'daThanhToan';
-  } else if (this.daThanhToan > 0) {
+  } else if (this.daThanhToan - (this.tienThuaDaKhauTru || 0) > 0) {
     this.trangThai = 'daThanhToanMotPhan';
   } else {
     this.trangThai = 'chuaThanhToan';

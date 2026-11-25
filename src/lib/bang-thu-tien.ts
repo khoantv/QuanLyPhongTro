@@ -9,7 +9,7 @@ import HoaDon from '@/models/HoaDon';
 import ChiSoDienNuoc from '@/models/ChiSoDienNuoc';
 import GiaoDichCongNo from '@/models/GiaoDichCongNo';
 import '@/models/KhachThue';
-import { soDuCongNo } from '@/lib/cong-no';
+import { tinhCongNo } from '@/lib/cong-no';
 import { hoaDonGanNhat, LapHoaDonError, lapHoaDonHangThang, tinhHoaDonHangThang } from '@/lib/hoa-don/lap-hoa-don';
 import { guiZaloTuDong } from '@/lib/hoa-don/gui-zalo';
 import { fmtNgay, kyThuCuaThang } from '@/lib/ky-thu';
@@ -44,6 +44,8 @@ export interface DongBangThuTien {
   phiDichVu: number;
   tienDienNuoc: number;
   noKyTruoc: number;
+  /** Tiền thừa khách đang có mà chưa trừ (dòng chưa lập hóa đơn) */
+  tienThuaKyTruoc: number;
   canDong: number;
   daDong: number;
   boQuaTienThua: number;
@@ -68,17 +70,25 @@ const soSanhMaPhong = (a: string, b: string) => a.localeCompare(b, 'vi', { numer
 interface ButToanLean { _id: OID; khachThue: OID; loai: string; soTien: number; hoaDon?: OID | null; ngayTao: Date }
 
 /** Đã đóng / bỏ qua / còn thiếu cho một hóa đơn: các bút toán được tạo sau hóa đơn và trước hóa đơn kế tiếp của khách. */
-function tinhDaDong(hoaDonId: string, butToans: ButToanLean[], canDong: number) {
+function tinhDaDong(hoaDonId: string, butToans: ButToanLean[], canDong: number, noKyTruoc: number) {
   const idx = butToans.findIndex((b) => b.loai === 'hoaDon' && String(b.hoaDon) === hoaDonId);
   if (idx < 0) return { daDong: 0, boQua: 0, conThieu: canDong };
   let daDong = 0;
   let boQua = 0;
   let bienDong = 0;
+  // Tiền thừa giữ lại (hóa đơn không khấu trừ): hoàn cho khách từ khoản này không làm khách nợ thêm
+  let giuLai = Math.max(0, noKyTruoc - butToans.slice(0, idx).reduce((s, b) => s + b.soTien, 0));
   for (let i = idx + 1; i < butToans.length && butToans[i].loai !== 'hoaDon'; i++) {
     const b = butToans[i];
     if (b.loai === 'thanhToan') daDong += -b.soTien;
     if (b.loai === 'boQuaTienThua') boQua += b.soTien;
-    bienDong += b.soTien;
+    if (b.loai === 'hoanTien') {
+      const tuGiuLai = Math.min(giuLai, b.soTien);
+      giuLai -= tuGiuLai;
+      bienDong += b.soTien - tuGiuLai;
+    } else {
+      bienDong += b.soTien;
+    }
   }
   return { daDong, boQua, conThieu: canDong + bienDong };
 }
@@ -145,7 +155,7 @@ export async function dungBangThuTien(toaNhaId: string, thang: number, nam: numb
         - (h.khoanGiamTru || []).reduce((s, g) => s + g.soTien, 0) + (h.tienLamTron || 0);
       const noKyTruoc = h.noKyTruoc ?? 0;
       const canDong = h.tongCanThanhToan ?? h.tongTien + noKyTruoc;
-      const kq = tinhDaDong(String(h._id), butToanTheoKhach.get(String(h.khachThue?._id)) ?? [], canDong);
+      const kq = tinhDaDong(String(h._id), butToanTheoKhach.get(String(h.khachThue?._id)) ?? [], canDong, noKyTruoc);
       dong.push({
         key: String(h._id),
         loai: h.loaiHoaDon === 'chotPhong' ? 'chotPhong' : 'hangThang',
@@ -166,6 +176,7 @@ export async function dungBangThuTien(toaNhaId: string, thang: number, nam: numb
         phiDichVu: phiKhac,
         tienDienNuoc: h.tienDien + h.tienNuoc,
         noKyTruoc,
+        tienThuaKyTruoc: 0,
         canDong,
         daDong: kq.daDong,
         boQuaTienThua: kq.boQua,
@@ -199,7 +210,7 @@ export async function dungBangThuTien(toaNhaId: string, thang: number, nam: numb
         chiSoDienCu: null, chiSoDienMoi: ghi?.chiSoDienMoi ?? null, soDien: 0,
         chiSoNuocCu: null, chiSoNuocMoi: ghi?.chiSoNuocMoi ?? null, soNuoc: 0,
         tienPhong: 0, tienPhongLe: 0, phiDichVu: 0, tienDienNuoc: 0,
-        noKyTruoc: 0, canDong: 0, daDong: 0, boQuaTienThua: 0, conThieu: 0,
+        noKyTruoc: 0, tienThuaKyTruoc: 0, canDong: 0, daDong: 0, boQuaTienThua: 0, conThieu: 0,
         hanThanhToan: null,
         trangThai: 'chuaLap',
         ghiChu: 'Chưa lập hóa đơn',
@@ -220,6 +231,7 @@ export async function dungBangThuTien(toaNhaId: string, thang: number, nam: numb
           phiDichVu: phiKhac,
           tienDienNuoc: bt.tienDien + bt.tienNuoc,
           noKyTruoc: bt.noKyTruoc,
+          tienThuaKyTruoc: bt.tienThuaKyTruoc,
           canDong: bt.tongCanThanhToan,
           conThieu: bt.tongCanThanhToan,
           hanThanhToan: bt.hanThanhToan.toISOString(),
@@ -235,7 +247,7 @@ export async function dungBangThuTien(toaNhaId: string, thang: number, nam: numb
           trangThai: 'chuaDenKy',
           chiSoDienCu: ganNhat?.chiSoDienCuoiKy ?? null,
           chiSoNuocCu: ganNhat?.chiSoNuocCuoiKy ?? null,
-          noKyTruoc: await soDuCongNo(hd.nguoiDaiDien?._id),
+          noKyTruoc: (await tinhCongNo(hd.nguoiDaiDien?._id)).noConLai,
           ghiChu: err instanceof LapHoaDonError ? err.message : `Kỳ ${fmtNgay(ky.batDau)}`,
         });
       }
@@ -247,7 +259,7 @@ export async function dungBangThuTien(toaNhaId: string, thang: number, nam: numb
         hopDongId: null, hoaDonId: null, maHoaDon: null, khachThueId: null,
         hoTen: '', soDienThoai: '', soNguoi: 0, ngayThu: null,
         chiSoDienCu: null, chiSoDienMoi: null, soDien: 0, chiSoNuocCu: null, chiSoNuocMoi: null, soNuoc: 0,
-        tienPhong: 0, tienPhongLe: 0, phiDichVu: 0, tienDienNuoc: 0, noKyTruoc: 0,
+        tienPhong: 0, tienPhongLe: 0, phiDichVu: 0, tienDienNuoc: 0, noKyTruoc: 0, tienThuaKyTruoc: 0,
         canDong: 0, daDong: 0, boQuaTienThua: 0, conThieu: 0, hanThanhToan: null,
         trangThai: 'phongTrong', ghiChu: 'Phòng trống', daGhiChiSo: false,
       });
@@ -323,12 +335,12 @@ export async function luuChiSoHangLoat(thang: number, nam: number, items: ChiSoN
 
 // ───────────────────────────── Lập hóa đơn hàng loạt ─────────────────────────────
 
-export async function lapHoaDonHangLoat(thang: number, nam: number, hopDongIds: string[], nguoiTao: string) {
+export async function lapHoaDonHangLoat(thang: number, nam: number, hopDongIds: string[], nguoiTao: string, khauTruTienThua = false) {
   let daLap = 0;
   const loi: Array<{ hopDongId: string; message: string }> = [];
   for (const id of hopDongIds) {
     try {
-      const hoaDon = await lapHoaDonHangThang({ hopDongId: id, thang, nam }, nguoiTao);
+      const hoaDon = await lapHoaDonHangThang({ hopDongId: id, thang, nam, khauTruTienThua }, nguoiTao);
       daLap++;
       if (hoaDon) guiZaloTuDong(hoaDon);
     } catch (err) {

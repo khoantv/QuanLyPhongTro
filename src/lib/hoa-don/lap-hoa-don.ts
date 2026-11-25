@@ -6,7 +6,7 @@ import '@/models/Phong';
 import '@/models/KhachThue';
 import { getCaiDatHoaDonLean } from '@/lib/cai-dat';
 import {
-  capNhatButToanHoaDon, ghiNhanHoaDonMoi, huyButToanHoaDon, soDuCongNo,
+  capNhatButToanHoaDon, ghiNhanHoaDonMoi, huyButToanHoaDon, tinhCongNo, tinhCongNoTruocHoaDon, tinhNoKyTruoc,
 } from '@/lib/cong-no';
 import {
   congNgay, dauNgayVN, fmtNgay, kyThuCuaThang, lamTron1000, soNgayGiua, tenTienPhongLe, tienPhongTheoNgay,
@@ -53,6 +53,8 @@ export interface HoaDonInput {
   ghiChu?: string | null;
   maHoaDon?: string | null;
   hinhThucThanhToan?: string | null;
+  /** Trừ tiền thừa kỳ trước vào hóa đơn này. Mặc định KHÔNG trừ (tiền thừa giữ lại cho khách). */
+  khauTruTienThua?: boolean | null;
 }
 
 export interface HopDongLean {
@@ -168,6 +170,10 @@ export interface BanTinhHoaDon {
   tienLamTron: number;
   tongTien: number;
   noKyTruoc: number;
+  /** Phần khách còn nợ từ trước (luôn tính vào hóa đơn) và tiền thừa có thể khấu trừ. */
+  noConLaiKyTruoc: number;
+  tienThuaKyTruoc: number;
+  khauTruTienThua: boolean;
   tongCanThanhToan: number;
   hanThanhToan: Date;
   ghiChuMacDinh: string;
@@ -271,7 +277,9 @@ export async function tinhHoaDonHangThang(input: HoaDonInput, batBuocChiSo = fal
   const tong = tinhTong({ tienPhong, tienDien, tienNuoc, phiDichVu, khoanGiamTru }, Boolean(caiDat.lamTronHoaDon));
   if (tong.tongTien < 0) throw new LapHoaDonError('Tổng hóa đơn không được âm — kiểm tra lại mục Giảm trừ');
 
-  const noKyTruoc = await soDuCongNo(hd.nguoiDaiDien);
+  const khauTruTienThua = Boolean(input.khauTruTienThua);
+  const congNo = await tinhCongNo(hd.nguoiDaiDien);
+  const noKyTruoc = tinhNoKyTruoc(congNo, khauTruTienThua);
   const hanThanhToan = input.hanThanhToan ? dauNgayVN(input.hanThanhToan) : congNgay(ky.batDau, caiDat.hanDongTien ?? 5);
 
   return {
@@ -303,6 +311,9 @@ export async function tinhHoaDonHangThang(input: HoaDonInput, batBuocChiSo = fal
     tienLamTron: tong.tienLamTron,
     tongTien: tong.tongTien,
     noKyTruoc,
+    noConLaiKyTruoc: congNo.noConLai,
+    tienThuaKyTruoc: congNo.tienThua,
+    khauTruTienThua,
     tongCanThanhToan: tong.tongTien + noKyTruoc,
     hanThanhToan,
     ghiChuMacDinh: caiDat.ghiChuMacDinh ?? '',
@@ -351,6 +362,7 @@ export async function lapHoaDonHangThang(input: HoaDonInput, nguoiTao?: string |
       khoanGiamTru: bt.khoanGiamTru,
       tienLamTron: bt.tienLamTron,
       tongTien: bt.tongTien,
+      khauTruTienThua: bt.khauTruTienThua,
       daThanhToan: 0,
       conLai: bt.tongTien,
       hanThanhToan: bt.hanThanhToan,
@@ -395,6 +407,8 @@ export interface CapNhatHoaDonInput {
   hanThanhToan?: string | Date;
   ghiChu?: string;
   hinhThucThanhToan?: string | null;
+  /** Đổi lựa chọn khấu trừ tiền thừa kỳ trước; bỏ trống = giữ nguyên */
+  khauTruTienThua?: boolean;
 }
 
 /**
@@ -437,6 +451,13 @@ export async function capNhatHoaDon(id: string, input: CapNhatHoaDonInput, nguoi
     ghiChu: input.ghiChu ?? hoaDon.ghiChu,
     hinhThucThanhToan: input.hinhThucThanhToan ?? hoaDon.hinhThucThanhToan,
   });
+  // Chỉ tính lại nợ kỳ trước khi thật sự đổi lựa chọn khấu trừ
+  const dangKhauTru = hoaDon.khauTruTienThua !== false;
+  if (hoaDon.loaiHoaDon !== 'chotPhong' && input.khauTruTienThua !== undefined && input.khauTruTienThua !== dangKhauTru) {
+    const truoc = await tinhCongNoTruocHoaDon(hoaDon);
+    hoaDon.khauTruTienThua = input.khauTruTienThua;
+    if (truoc) hoaDon.noKyTruoc = tinhNoKyTruoc(truoc, input.khauTruTienThua);
+  }
   await hoaDon.save();
   await capNhatButToanHoaDon(hoaDon, nguoiId);
 

@@ -9,7 +9,7 @@ import HopDong from '@/models/HopDong';
 import Phong from '@/models/Phong';
 import '@/models/KhachThue';
 import { getCaiDatHoaDonLean } from '@/lib/cai-dat';
-import { ghiButToan, ghiNhanHoaDonMoi, recomputeCongNo, soDuCongNo } from '@/lib/cong-no';
+import { ghiButToan, ghiNhanHoaDonMoi, recomputeCongNo, soDuCongNo, tinhCongNo } from '@/lib/cong-no';
 import {
   chuanHoaGiamTru, chuanHoaPhi, DongGiamTru, DongPhi, HopDongLean, hoaDonGanNhat, LapHoaDonError,
   maPhong, phongId, taiHopDong, ThayDongHo, tinhTieuThu, tinhTong,
@@ -407,6 +407,13 @@ export async function traPhong(input: TraPhongInput, nguoiId?: string | null) {
     khoanGiamTru: input.khoanGiamTru,
   }, 'traPhong', maThaoTac, nguoiId);
 
+  // Trả phòng là tất toán: tiền thừa đang giữ lại được bù vào các hóa đơn còn nợ
+  const boGiuLai = await HoaDon.updateMany(
+    { khachThue: hd.nguoiDaiDien, khauTruTienThua: false, conLai: { $gt: 0 } },
+    { $set: { khauTruTienThua: true } },
+  );
+  if (boGiuLai.modifiedCount) await recomputeCongNo(hd.nguoiDaiDien);
+
   let truCoc = 0;
   if (input.dungCocTruNo !== false && (hd.tienCoc ?? 0) > 0) {
     const soDu = await soDuCongNo(hd.nguoiDaiDien);
@@ -476,9 +483,9 @@ export async function hoanTienChoKhach(input: HoanTienInput, nguoiId?: string | 
   let danhMucKey: string;
   let noiDung: string;
   if (input.nguon === 'tienThua') {
-    const soDu = await soDuCongNo(khach._id);
-    if (-soDu < soTien) {
-      throw new LapHoaDonError(`Khách chỉ có ${Math.max(0, -soDu).toLocaleString('vi-VN')}đ tiền thừa`);
+    const { tienThua } = await tinhCongNo(khach._id);
+    if (tienThua < soTien) {
+      throw new LapHoaDonError(`Khách chỉ có ${tienThua.toLocaleString('vi-VN')}đ tiền thừa`);
     }
     await ghiButToan({
       khachThue: khach._id,

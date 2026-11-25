@@ -6,7 +6,7 @@ import { LapHoaDonError } from '@/lib/hoa-don/lap-hoa-don';
 import { lapHoaDonHangLoat } from '@/lib/bang-thu-tien';
 import { coQuanLy, docThangNam } from '../_params';
 
-// POST /api/bang-thu-tien/lap-hoa-don { thang, nam, hopDongIds: string[] }
+// POST /api/bang-thu-tien/lap-hoa-don { thang, nam, hopDongIds: string[], khauTruTienThua?: boolean (mặc định không trừ) }
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const { thang, nam } = docThangNam(body ?? {});
     const ids: string[] = Array.isArray(body.hopDongIds) ? body.hopDongIds.filter((x: unknown) => typeof x === 'string') : [];
     if (ids.length === 0) return NextResponse.json({ message: 'Chưa chọn hợp đồng nào' }, { status: 400 });
-    const kq = await lapHoaDonHangLoat(thang, nam, ids, session.user.id);
+    const kq = await lapHoaDonHangLoat(thang, nam, ids, session.user.id, body.khauTruTienThua === true);
     return NextResponse.json({ success: true, data: kq, message: `Đã lập ${kq.daLap} hóa đơn` });
   } catch (error) {
     if (error instanceof LapHoaDonError) return NextResponse.json({ message: error.message }, { status: error.status });

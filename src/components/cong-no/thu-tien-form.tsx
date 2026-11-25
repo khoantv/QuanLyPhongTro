@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { tinhTienThua, xemTruocPhanBo, type HoaDonMo } from '@/lib/cong-no/phan-bo';
+import { phanBoFIFO, tinhTienThua, xemTruocPhanBo, type ButToanPhanBo, type HoaDonMo } from '@/lib/cong-no/phan-bo';
 import type { GiaoDichCongNo, HinhThucThanhToan, XuLyTienThua } from '@/types';
 import { SoDuBadge, formatVND } from './so-du';
 
@@ -134,25 +134,38 @@ export function ThuTienForm({
       .finally(() => setLoadingCongNo(false));
   }, [khachThueId]);
 
-  // Số dư "nền" = số dư hiện tại trừ đi ảnh hưởng của chính thanh toán đang sửa
-  const soDuNen = useMemo(() => {
-    if (!congNo) return 0;
-    if (!dangSua) return congNo.soDu;
-    const anhHuong = congNo.butToan
-      .filter((b) => !b.daHuy && idOf(b.thanhToan) === thanhToan?._id)
-      .reduce((s, b) => s + b.soTien, 0);
-    return congNo.soDu - anhHuong;
-  }, [congNo, dangSua, thanhToan?._id]);
+  // Công nợ "nền" = không tính thanh toán đang sửa. Nợ và tiền thừa tách riêng vì tiền thừa
+  // có thể đang giữ lại (hóa đơn không khấu trừ).
+  const butToanNen = useMemo<ButToanPhanBo[]>(() => (congNo?.butToan ?? [])
+    .filter((b) => !b.daHuy && !(dangSua && idOf(b.thanhToan) === thanhToan?._id))
+    .map((b) => ({
+      id: b._id,
+      soTien: b.soTien,
+      ngayGhiNhan: b.ngayGhiNhan,
+      ngayTao: b.ngayTao,
+      hoaDon: idOf(b.hoaDon) || null,
+      khongKhauTru: Boolean(b.hoaDon && typeof b.hoaDon === 'object' && b.hoaDon.khauTruTienThua === false),
+    })), [congNo, dangSua, thanhToan?._id]);
+  const nen = useMemo(() => phanBoFIFO(butToanNen), [butToanNen]);
+  const ngayTaoThanhToan = useMemo(
+    () => congNo?.butToan.find((b) => dangSua && b.loai === 'thanhToan' && idOf(b.thanhToan) === thanhToan?._id)?.ngayTao,
+    [congNo, dangSua, thanhToan?._id],
+  );
 
   // Gợi ý số tiền = số đang nợ khi tạo mới
   useEffect(() => {
     if (!daNhapSoTien && congNo && !dangSua) {
-      setForm((f) => ({ ...f, soTien: Math.max(0, congNo.soDu) }));
+      setForm((f) => ({ ...f, soTien: nen.noConLai }));
     }
-  }, [congNo, daNhapSoTien, dangSua]);
+  }, [congNo, daNhapSoTien, dangSua, nen.noConLai]);
 
-  const tienThua = tinhTienThua(form.soTien, soDuNen - form.soTien);
-  const dongTruoc = soDuNen <= 0;
+  const tienThua = useMemo(() => {
+    if (form.soTien <= 0) return 0;
+    const ngayTao = ngayTaoThanhToan ?? new Date();
+    const khiCo = phanBoFIFO([...butToanNen, { id: 'dang-nhap', soTien: -form.soTien, ngayGhiNhan: ngayTao, ngayTao }]);
+    return tinhTienThua(form.soTien, khiCo.tienThua, nen.tienThua);
+  }, [butToanNen, form.soTien, nen.tienThua, ngayTaoThanhToan]);
+  const dongTruoc = nen.noConLai <= 0;
 
   // Lựa chọn xử lý tiền thừa mặc định
   useEffect(() => {
@@ -261,7 +274,11 @@ export function ThuTienForm({
             <>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">{dangSua ? 'Số dư (không tính thanh toán này)' : 'Số dư hiện tại'}</span>
-                <SoDuBadge soDu={soDuNen} />
+                <span className="flex flex-wrap justify-end gap-1">
+                  {nen.noConLai > 0 && <SoDuBadge soDu={nen.noConLai} />}
+                  {nen.tienThua > 0 && <SoDuBadge soDu={-nen.tienThua} />}
+                  {nen.noConLai <= 0 && nen.tienThua <= 0 && <SoDuBadge soDu={0} />}
+                </span>
               </div>
               {!dangSua && congNo.hoaDonMo.length > 0 && (
                 <div className="space-y-1">
@@ -283,9 +300,9 @@ export function ThuTienForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="soTien">Số tiền (VNĐ)</Label>
-          {congNo && soDuNen > 0 && (
-            <button type="button" className="text-xs text-primary hover:underline" onClick={() => { setForm((f) => ({ ...f, soTien: soDuNen })); setDaNhapSoTien(true); }}>
-              Điền số đang nợ ({formatVND(soDuNen)})
+          {congNo && nen.noConLai > 0 && (
+            <button type="button" className="text-xs text-primary hover:underline" onClick={() => { setForm((f) => ({ ...f, soTien: nen.noConLai })); setDaNhapSoTien(true); }}>
+              Điền số đang nợ ({formatVND(nen.noConLai)})
             </button>
           )}
         </div>
@@ -314,11 +331,11 @@ export function ThuTienForm({
           </p>
           <label className="flex items-start gap-2 cursor-pointer">
             <input type="radio" name="xuLyTienThua" className="mt-1" checked={xuLyTienThua === 'truKySau'} onChange={() => { setXuLyTienThua('truKySau'); setDaChonXuLy(true); }} />
-            <span>Trừ vào kỳ sau <span className="text-muted-foreground">— hóa đơn sau hiện &quot;Tiền thừa kỳ trước&quot;</span></span>
+            <span>Giữ lại cho kỳ sau <span className="text-muted-foreground">— khi lập hóa đơn sau, bạn chọn có khấu trừ hay không</span></span>
           </label>
           <label className="flex items-start gap-2 cursor-pointer">
             <input type="radio" name="xuLyTienThua" className="mt-1" checked={xuLyTienThua === 'khongTru'} onChange={() => { setXuLyTienThua('khongTru'); setDaChonXuLy(true); }} />
-            <span>Không trừ <span className="text-muted-foreground">— bỏ qua phần thừa, số dư khách về 0</span></span>
+            <span>Bỏ qua <span className="text-muted-foreground">— không giữ phần thừa, số dư khách về 0</span></span>
           </label>
         </div>
       )}

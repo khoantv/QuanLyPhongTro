@@ -26,6 +26,9 @@ import {
 } from 'lucide-react';
 import { HoaDon, HopDong, Phong, KhachThue, PhiDichVu, KhoanGiamTru } from '@/types';
 import { PhiDichVuEditor, GiamTruEditor, lamTron1000 } from '@/components/hoa-don/khoan-thu-editor';
+import { tinhTrangThaiHoaDon } from '@/lib/cong-no/phan-bo';
+import { dauNgayVN } from '@/lib/ky-thu';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { danhDauDuLieuThayDoi } from '@/hooks/use-cache';
 
@@ -66,7 +69,16 @@ export default function ChinhSuaHoaDonPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const [noKyTruoc, setNoKyTruoc] = useState(0);
+  const [noKyTruocLuu, setNoKyTruocLuu] = useState(0);
+  const [khauTruLuu, setKhauTruLuu] = useState(true);
+  const [khauTru, setKhauTru] = useState(true);
+  const [truocHoaDon, setTruocHoaDon] = useState({ no: 0, thua: 0 });
+  const [phuongAn, setPhuongAn] = useState({
+    coTru: { daThanhToan: 0, daKhauTru: 0 },
+    khongTru: { daThanhToan: 0, daKhauTru: 0 },
+  });
+  // Giữ số đã lưu; chỉ tính lại khi người dùng đổi lựa chọn khấu trừ
+  const noKyTruoc = khauTru === khauTruLuu ? noKyTruocLuu : truocHoaDon.no - (khauTru ? truocHoaDon.thua : 0);
   const [formData, setFormData] = useState({
     maHoaDon: '',
     hopDong: '',
@@ -144,15 +156,20 @@ export default function ChinhSuaHoaDonPage() {
             phiDichVu: hoaDonItem.phiDichVu || [],
             khoanGiamTru: hoaDonItem.khoanGiamTru || [],
             tongTien: hoaDonItem.tongTien || 0,
-            daThanhToan: hoaDonItem.daThanhToan || 0,
+            daThanhToan: (hoaDonItem.khauTruTienThua !== false ? hoaDonItem.phuongAnKhauTru?.coTru : hoaDonItem.phuongAnKhauTru?.khongTru)?.daThanhToan ?? hoaDonItem.daThanhToan ?? 0,
             conLai: hoaDonItem.conLai || 0,
             trangThai: hoaDonItem.trangThai || 'chuaThanhToan',
-            hanThanhToan: hoaDonItem.hanThanhToan ? 
-              (typeof hoaDonItem.hanThanhToan === 'string' ? (hoaDonItem.hanThanhToan as string).split('T')[0] : 
-               new Date(hoaDonItem.hanThanhToan as Date).toISOString().split('T')[0]) : '',
+            // Ngày theo giờ VN — cắt chuỗi UTC sẽ lùi hạn một ngày mỗi lần lưu
+            hanThanhToan: hoaDonItem.hanThanhToan
+              ? new Date(hoaDonItem.hanThanhToan).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
+              : '',
             ghiChu: hoaDonItem.ghiChu || '',
           });
-          setNoKyTruoc((hoaDonItem as { noKyTruoc?: number }).noKyTruoc ?? 0);
+          setNoKyTruocLuu(hoaDonItem.noKyTruoc ?? 0);
+          setKhauTruLuu(hoaDonItem.khauTruTienThua !== false);
+          setKhauTru(hoaDonItem.khauTruTienThua !== false);
+          if (hoaDonItem.phuongAnKhauTru) setPhuongAn(hoaDonItem.phuongAnKhauTru);
+          setTruocHoaDon({ no: hoaDonItem.noConLaiKyTruoc ?? 0, thua: hoaDonItem.tienThuaKyTruoc ?? 0 });
         } else {
           toast.error('Không tìm thấy hóa đơn');
           router.push('/dashboard/hoa-don');
@@ -218,6 +235,22 @@ export default function ChinhSuaHoaDonPage() {
     calculateTotal();
   }, [formData.tienPhong, formData.chiSoDienBanDau, formData.chiSoDienCuoiKy, formData.chiSoNuocBanDau, formData.chiSoNuocCuoiKy, formData.phiDichVu, formData.khoanGiamTru, formData.daThanhToan, formData.hopDong, hopDongList, lamTron]);
 
+  // Phần khấu trừ tiền thừa không phải là một lần thu tiền
+  const daKhauTru = Math.min(formData.daThanhToan, (khauTru ? phuongAn.coTru : phuongAn.khongTru).daKhauTru);
+  const daThuThucTe = formData.daThanhToan - daKhauTru;
+  const trangThaiXemTruoc = tinhTrangThaiHoaDon(
+    formData.tongTien,
+    formData.daThanhToan,
+    formData.hanThanhToan ? dauNgayVN(formData.hanThanhToan) : null,
+    new Date(),
+    daKhauTru,
+  ).trangThai;
+
+  // Mở từ Bảng thu tiền (?ve=bang-thu-tien) thì lưu / hủy xong quay lại đúng tháng của bảng đó
+  const quayVe = () => (new URLSearchParams(window.location.search).get('ve') === 'bang-thu-tien'
+    ? `/dashboard/bang-thu-tien?thang=${formData.thang}&nam=${formData.nam}`
+    : '/dashboard/hoa-don');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -225,6 +258,7 @@ export default function ChinhSuaHoaDonPage() {
     try {
       const requestData = {
         ...formData,
+        ...(khauTru !== khauTruLuu ? { khauTruTienThua: khauTru } : {}),
         id: hoaDonId
       };
       
@@ -243,7 +277,7 @@ export default function ChinhSuaHoaDonPage() {
         // Xóa cache
         danhDauDuLieuThayDoi();
         toast.success(result.message || 'Hóa đơn đã được cập nhật thành công');
-        router.replace('/dashboard/hoa-don');
+        router.replace(quayVe());
         router.refresh();
       } else {
         const errorData = await response.json();
@@ -276,7 +310,7 @@ export default function ChinhSuaHoaDonPage() {
           <Button 
             variant="outline" 
             size="icon"
-            onClick={() => router.push('/dashboard/hoa-don')}
+            onClick={() => router.push(quayVe())}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -295,7 +329,7 @@ export default function ChinhSuaHoaDonPage() {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => router.push('/dashboard/hoa-don')}
+          onClick={() => router.push(quayVe())}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -480,7 +514,7 @@ export default function ChinhSuaHoaDonPage() {
                     <Input
                       id="daThanhToan"
                       type="number"
-                      value={formData.daThanhToan}
+                      value={daThuThucTe}
                       readOnly
                       disabled
                       className="h-10 text-sm"
@@ -634,7 +668,7 @@ export default function ChinhSuaHoaDonPage() {
                   </div>
                   <div className="text-center">
                     <div className="text-xs text-gray-600 mb-1">Đã thanh toán</div>
-                    <div className="text-lg font-bold text-green-600">{formData.daThanhToan.toLocaleString('vi-VN')} VNĐ</div>
+                    <div className="text-lg font-bold text-green-600">{daThuThucTe.toLocaleString('vi-VN')} VNĐ</div>
                   </div>
                   <div className="text-center">
                     <div className="text-xs text-gray-600 mb-1">Còn lại</div>
@@ -645,6 +679,23 @@ export default function ChinhSuaHoaDonPage() {
                 </div>
 
                 {lamTron && <p className="text-xs text-muted-foreground">Tổng tiền đã làm tròn đến 1.000đ theo Cài đặt phiếu thu.</p>}
+                {truocHoaDon.thua > 0 && hoaDon.loaiHoaDon !== 'chotPhong' && (
+                  <label className="flex items-start gap-2 cursor-pointer rounded-lg border p-3 text-sm">
+                    <Checkbox
+                      checked={khauTru}
+                      onCheckedChange={(v) => {
+                        const chon = Boolean(v);
+                        setKhauTru(chon);
+                        setFormData(prev => ({ ...prev, daThanhToan: (chon ? phuongAn.coTru : phuongAn.khongTru).daThanhToan }));
+                      }}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Khấu trừ tiền thừa kỳ trước <strong className="text-emerald-700">{truocHoaDon.thua.toLocaleString('vi-VN')}đ</strong> vào hóa đơn này
+                      <span className="block text-xs text-muted-foreground">Bỏ chọn: khách trả đủ tiền hóa đơn, tiền thừa vẫn giữ lại cho khách.</span>
+                    </span>
+                  </label>
+                )}
                 {noKyTruoc !== 0 && (
                   <div className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
                     <span>{noKyTruoc > 0 ? 'Nợ kỳ trước' : 'Tiền thừa kỳ trước'}: <strong className={noKyTruoc > 0 ? 'text-red-600' : 'text-emerald-600'}>{noKyTruoc.toLocaleString('vi-VN')} VNĐ</strong></span>
@@ -655,7 +706,7 @@ export default function ChinhSuaHoaDonPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="trangThai" className="text-sm">Trạng thái</Label>
-                    <Select value={formData.trangThai} disabled onValueChange={(value) => setFormData(prev => ({ ...prev, trangThai: value as 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan' }))}>
+                    <Select value={trangThaiXemTruoc} disabled onValueChange={(value) => setFormData(prev => ({ ...prev, trangThai: value as 'chuaThanhToan' | 'daThanhToanMotPhan' | 'daThanhToan' | 'quaHan' }))}>
                       <SelectTrigger className="h-10">
                         <SelectValue placeholder="Chọn trạng thái" />
                       </SelectTrigger>
@@ -686,7 +737,7 @@ export default function ChinhSuaHoaDonPage() {
                     type="button" 
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push('/dashboard/hoa-don')}
+                    onClick={() => router.push(quayVe())}
                     disabled={submitting}
                     className="w-full sm:w-auto sm:min-w-[80px]"
                   >

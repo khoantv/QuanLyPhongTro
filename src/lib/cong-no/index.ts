@@ -7,7 +7,7 @@ import '@/models/Phong';
 import '@/models/KhachThue';
 import '@/models/ThanhToan';
 import '@/models/NguoiDung';
-import { phanBoFIFO, tinhTienThua, tinhTrangThaiHoaDon } from './phan-bo';
+import { KetQuaPhanBo, phanBoFIFO, tinhNoKyTruoc, tinhTienThua, tinhTrangThaiHoaDon } from './phan-bo';
 
 export * from './phan-bo';
 
@@ -75,39 +75,73 @@ export async function soDuNhieuKhach(khachThueIds?: Id[]): Promise<Record<string
 }
 
 /**
- * Tính lại toàn bộ phân bổ FIFO của một khách và ghi daThanhToan / conLai / trangThai
- * vào các hóa đơn của khách. Idempotent — gọi lại bao nhiêu lần cũng ra cùng kết quả.
+ * Phân bổ công nợ hiện tại của khách (không ghi DB).
+ * @param loc lọc thêm bút toán (vd chỉ các bút toán trước một hóa đơn)
+ * @param moPhong thử với lựa chọn khấu trừ khác cho một hóa đơn
  */
-export async function recomputeCongNo(khachThueId: Id) {
+export async function tinhCongNo(
+  khachThueId: Id,
+  loc: Record<string, unknown> = {},
+  moPhong?: { hoaDonId: string; khauTru: boolean },
+): Promise<KetQuaPhanBo> {
   const khachThue = toId(khachThueId);
-  const butToans = await GiaoDichCongNo.find({ khachThue, daHuy: false })
-    .select('soTien ngayGhiNhan ngayTao hoaDon')
-    .lean<Array<Pick<IGiaoDichCongNo, 'soTien' | 'ngayGhiNhan' | 'ngayTao' | 'hoaDon'> & { _id: mongoose.Types.ObjectId }>>();
-
-  const ketQua = phanBoFIFO(butToans.map((b) => ({
+  const [butToans, hoaDonKhongKhauTru] = await Promise.all([
+    GiaoDichCongNo.find({ ...loc, khachThue, daHuy: false })
+      .select('soTien ngayGhiNhan ngayTao hoaDon')
+      .lean<Array<Pick<IGiaoDichCongNo, 'soTien' | 'ngayGhiNhan' | 'ngayTao' | 'hoaDon'> & { _id: mongoose.Types.ObjectId }>>(),
+    HoaDon.find({ khachThue, khauTruTienThua: false }).select('_id').lean<Array<{ _id: mongoose.Types.ObjectId }>>(),
+  ]);
+  const khong = new Set(hoaDonKhongKhauTru.map((h) => String(h._id)));
+  if (moPhong) {
+    if (moPhong.khauTru) khong.delete(moPhong.hoaDonId);
+    else khong.add(moPhong.hoaDonId);
+  }
+  return phanBoFIFO(butToans.map((b) => ({
     id: String(b._id),
     soTien: b.soTien,
     ngayGhiNhan: b.ngayGhiNhan,
     ngayTao: b.ngayTao,
     hoaDon: b.hoaDon ? String(b.hoaDon) : null,
+    khongKhauTru: Boolean(b.hoaDon && khong.has(String(b.hoaDon))),
   })));
+}
+
+/** Công nợ của khách ngay trước khi lập một hóa đơn đã có. */
+export async function tinhCongNoTruocHoaDon(hoaDon: { _id: Id; khachThue: Id | { _id: Id } }) {
+  const butToan = await GiaoDichCongNo.findOne({ hoaDon: toId(hoaDon._id), loai: 'hoaDon', daHuy: false })
+    .select('ngayTao').lean<{ ngayTao: Date } | null>();
+  if (!butToan) return null;
+  return tinhCongNo(refId(hoaDon.khachThue)!, { ngayTao: { $lt: butToan.ngayTao } });
+}
+
+/**
+ * Tính lại toàn bộ phân bổ FIFO của một khách và ghi daThanhToan / conLai / trangThai
+ * vào các hóa đơn của khách. Idempotent — gọi lại bao nhiêu lần cũng ra cùng kết quả.
+ */
+export async function recomputeCongNo(khachThueId: Id) {
+  const khachThue = toId(khachThueId);
+  const ketQua = await tinhCongNo(khachThueId);
 
   const hoaDons = await HoaDon.find({ khachThue })
-    .select('tongTien daThanhToan conLai trangThai hanThanhToan')
-    .lean<Array<{ _id: mongoose.Types.ObjectId; tongTien: number; daThanhToan: number; conLai: number; trangThai: string; hanThanhToan: Date }>>();
+    .select('tongTien daThanhToan conLai trangThai hanThanhToan tienThuaDaKhauTru')
+    .lean<Array<{ _id: mongoose.Types.ObjectId; tongTien: number; daThanhToan: number; conLai: number; trangThai: string; hanThanhToan: Date; tienThuaDaKhauTru?: number }>>();
 
   const now = new Date();
   const ops = [];
   for (const hd of hoaDons) {
-    const daThanhToan = Math.min(hd.tongTien, ketQua.daPhanBoTheoHoaDon.get(String(hd._id)) ?? 0);
-    const { conLai, trangThai } = tinhTrangThaiHoaDon(hd.tongTien, daThanhToan, hd.hanThanhToan, now);
-    if (hd.daThanhToan !== daThanhToan || hd.conLai !== conLai || hd.trangThai !== trangThai) {
-      ops.push({ updateOne: { filter: { _id: hd._id }, update: { $set: { daThanhToan, conLai, trangThai } } } });
+    const id = String(hd._id);
+    // Hóa đơn chốt âm không nhận phân bổ — giữ 0 (daThanhToan không được âm)
+    const daThanhToan = Math.min(Math.max(0, hd.tongTien), ketQua.daPhanBoTheoHoaDon.get(id) ?? 0);
+    const tienThuaDaKhauTru = Math.min(daThanhToan, ketQua.daKhauTruTheoHoaDon.get(id) ?? 0);
+    const { conLai, trangThai } = tinhTrangThaiHoaDon(hd.tongTien, daThanhToan, hd.hanThanhToan, now, tienThuaDaKhauTru);
+    if (hd.daThanhToan !== daThanhToan || hd.conLai !== conLai || hd.trangThai !== trangThai
+      || (hd.tienThuaDaKhauTru ?? 0) !== tienThuaDaKhauTru) {
+      ops.push({ updateOne: { filter: { _id: hd._id }, update: { $set: { daThanhToan, conLai, trangThai, tienThuaDaKhauTru } } } });
     }
   }
   if (ops.length) await HoaDon.bulkWrite(ops);
 
-  return { soDu: ketQua.soDu, tienThua: ketQua.tienThua, soHoaDonCapNhat: ops.length };
+  return { soDu: ketQua.soDu, tienThua: ketQua.tienThua, noConLai: ketQua.noConLai, soHoaDonCapNhat: ops.length };
 }
 
 interface HoaDonLike {
@@ -119,6 +153,8 @@ interface HoaDonLike {
   thang?: number;
   nam?: number;
   tongTien: number;
+  /** false = không trừ tiền thừa kỳ trước vào hóa đơn; bỏ trống = có trừ (hóa đơn cũ, hóa đơn chốt) */
+  khauTruTienThua?: boolean;
 }
 
 const refId = (v: Id | { _id: Id } | null | undefined): Id | null =>
@@ -133,7 +169,7 @@ export async function ghiNhanHoaDonMoi(hoaDon: HoaDonLike, nguoiTao?: Id | null)
   const daCo = await GiaoDichCongNo.findOne({ hoaDon: toId(hoaDon._id), loai: 'hoaDon', daHuy: false });
   if (daCo) return recomputeCongNo(khachThue);
 
-  const noKyTruoc = await soDuCongNo(khachThue);
+  const noKyTruoc = tinhNoKyTruoc(await tinhCongNo(khachThue), hoaDon.khauTruTienThua !== false);
   await HoaDon.updateOne(
     { _id: toId(hoaDon._id) },
     { $set: { noKyTruoc, tongCanThanhToan: hoaDon.tongTien + noKyTruoc } },
@@ -232,8 +268,11 @@ async function apDungXuLyTienThua(
     { thanhToan: toId(thanhToan._id), loai: 'boQuaTienThua' },
     { nguoiHuy: nguoiId, lyDo: 'Tính lại xử lý tiền thừa' },
   );
-  const soDuSau = await soDuCongNo(thanhToan.khachThue);
-  const tienThua = tinhTienThua(thanhToan.soTien, soDuSau);
+  const [khiCo, khiChua] = await Promise.all([
+    tinhCongNo(thanhToan.khachThue),
+    tinhCongNo(thanhToan.khachThue, { thanhToan: { $ne: toId(thanhToan._id) } }),
+  ]);
+  const tienThua = tinhTienThua(thanhToan.soTien, khiCo.tienThua, khiChua.tienThua);
   if (xuLyTienThua === 'khongTru' && tienThua > 0) {
     await ghiButToan({
       khachThue: thanhToan.khachThue,
@@ -328,6 +367,7 @@ export async function tinhConLaiDenHoaDon(hoaDon: {
         .select('_id')
         .lean<Array<{ _id: mongoose.Types.ObjectId }>>()
     : [];
-  const soDu = await soDuCongNo(khachThue, butToanHoaDonSau.map((b) => b._id));
-  return Math.max(0, soDu);
+  // Chỉ tính phần còn nợ: tiền thừa chưa khấu trừ không làm giảm số khách phải trả
+  const kq = await tinhCongNo(khachThue, { _id: { $nin: butToanHoaDonSau.map((b) => b._id) } });
+  return kq.noConLai;
 }
