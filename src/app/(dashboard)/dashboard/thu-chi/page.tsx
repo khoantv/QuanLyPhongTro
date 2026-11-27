@@ -31,6 +31,7 @@ import {
   FolderCog, Printer, FileSpreadsheet, Edit, RefreshCw, Filter, X, Check,
 } from 'lucide-react';
 import { DeleteConfirmPopover } from '@/components/ui/delete-confirm-popover';
+import { MoneyInput } from '@/components/ui/money-input';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CategoryManagerDialog } from './category-manager';
@@ -49,6 +50,15 @@ function danhMucId(dm: PhieuThuChi['danhMuc']): string {
   if (typeof dm === 'object' && dm?._id) return dm._id;
   return '';
 }
+/** Kiểu xem thống kê: một tháng, nhiều tháng tùy chọn, hoặc khoảng ngày. */
+type CheDoXem = 'thang' | 'nhieuThang' | 'khoang';
+const khoaThang = (n: number, t: number) => `${n}-${String(t).padStart(2, '0')}`;
+const nhanThang = (k: string) => { const [n, t] = k.split('-'); return `${Number(t)}/${n}`; };
+/** Tháng (giờ VN) của một ngày, dạng "2026-09". */
+const thangCuaNgay = (d: Date | string) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 7);
+const ngayInput = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+const fmtNgayInput = (s: string) => s.split('-').reverse().join('/');
+
 function fmtDate(d: Date | string): string {
   const date = new Date(d);
   return date.toLocaleDateString('vi-VN');
@@ -58,6 +68,10 @@ export default function ThuChiPage() {
   const now = new Date();
   const [nam, setNam] = useState(now.getFullYear());
   const [thang, setThang] = useState(now.getMonth() + 1);
+  const [cheDo, setCheDo] = useState<CheDoXem>('thang');
+  const [thangChon, setThangChon] = useState<string[]>([khoaThang(now.getFullYear(), now.getMonth() + 1)]);
+  const [tuNgay, setTuNgay] = useState(ngayInput(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [denNgay, setDenNgay] = useState(ngayInput(now));
 
   const [toaNhaList, setToaNhaList] = useState<ToaNha[]>([]);
   const [selectedToaNha, setSelectedToaNha] = useState<string>('all');
@@ -82,14 +96,25 @@ export default function ThuChiPage() {
   const [catManager, setCatManager] = useState<{ loai: LoaiThuChi; add: boolean } | null>(null);
 
   const fetchPhieu = useCallback(async () => {
-    const params = new URLSearchParams({ thang: String(thang), nam: String(nam) });
+    const params = new URLSearchParams();
+    if (cheDo === 'nhieuThang') {
+      if (thangChon.length === 0) { setPhieuList([]); return; }
+      params.set('thangs', [...thangChon].sort().join(','));
+    } else if (cheDo === 'khoang') {
+      if (!tuNgay || !denNgay || tuNgay > denNgay) { setPhieuList([]); return; }
+      params.set('tuNgay', tuNgay);
+      params.set('denNgay', denNgay);
+    } else {
+      params.set('thang', String(thang));
+      params.set('nam', String(nam));
+    }
     if (selectedToaNha !== 'all') params.append('toaNha', selectedToaNha);
     const res = await fetch(`/api/phieu-thu-chi?${params.toString()}`);
     if (res.ok) {
       const j = await res.json();
       if (j.success) setPhieuList(j.data);
     }
-  }, [thang, nam, selectedToaNha]);
+  }, [cheDo, thang, nam, thangChon, tuNgay, denNgay, selectedToaNha]);
 
   const fetchStatic = useCallback(async () => {
     const [rDm, rTn] = await Promise.all([
@@ -152,6 +177,40 @@ export default function ThuChiPage() {
     return { tongThu, tongChi, loiNhuan: tongThu - tongChi };
   }, [filtered]);
 
+  // Tổng hợp theo từng tháng (khi xem nhiều tháng / khoảng ngày) — áp dụng cùng bộ lọc
+  const theoThang = useMemo(() => {
+    const m = new Map<string, { thu: number; chi: number; soPhieu: number }>();
+    if (cheDo === 'nhieuThang') for (const k of thangChon) m.set(k, { thu: 0, chi: 0, soPhieu: 0 });
+    for (const p of filtered) {
+      const k = thangCuaNgay(p.ngayLapPhieu);
+      const v = m.get(k) ?? { thu: 0, chi: 0, soPhieu: 0 };
+      v[p.loai] += p.soTien;
+      v.soPhieu += 1;
+      m.set(k, v);
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ k, ...v, loiNhuan: v.thu - v.chi }));
+  }, [filtered, cheDo, thangChon]);
+
+  const nhanKy = cheDo === 'thang'
+    ? `tháng ${thang}/${nam}`
+    : cheDo === 'khoang'
+      ? `từ ${fmtNgayInput(tuNgay)} đến ${fmtNgayInput(denNgay)}`
+      : thangChon.length === 0
+        ? '(chưa chọn tháng)'
+        : thangChon.length <= 4
+          ? `tháng ${[...thangChon].sort().map(nhanThang).join(', ')}`
+          : `${thangChon.length} tháng (${nhanThang([...thangChon].sort()[0])} – ${nhanThang([...thangChon].sort().slice(-1)[0])})`;
+
+  const chonNhanh = (ds: Array<[number, number]>) => { setCheDo('nhieuThang'); setThangChon(ds.map(([n, t]) => khoaThang(n, t))); };
+  const thangGanNhat = (so: number) => Array.from({ length: so }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (so - 1 - i), 1);
+    return [d.getFullYear(), d.getMonth() + 1] as [number, number];
+  });
+  const toggleThang = (m: number) => {
+    const k = khoaThang(nam, m);
+    setThangChon((ds) => (ds.includes(k) ? ds.filter((x) => x !== k) : [...ds, k]));
+  };
+
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/phieu-thu-chi/${id}`, { method: 'DELETE' });
     const r = await res.json();
@@ -184,7 +243,9 @@ export default function ThuChiPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `thu-chi-${thang}-${nam}.csv`;
+    a.download = cheDo === 'thang'
+      ? `thu-chi-${thang}-${nam}.csv`
+      : `thu-chi-${nhanKy.replace(/[^0-9]+/g, '-').replace(/^-|-$/g, '')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -204,33 +265,100 @@ export default function ThuChiPage() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Month bar */}
+      {/* Kiểu xem: một tháng / nhiều tháng / khoảng ngày */}
       <Card className="p-0 overflow-hidden">
-        <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto">
-          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setNam((y) => y - 1)}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Năm trước
-          </Button>
-          <div className="flex gap-1">
-            {MONTHS.map((m) => (
-              <button
-                key={m}
-                onClick={() => setThang(m)}
-                className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-md text-center transition-colors min-w-[58px]',
-                  m === thang
-                    ? 'bg-green-50 border-2 border-green-500 text-green-700'
-                    : 'border-2 border-transparent hover:bg-gray-50 text-gray-600',
-                )}
-              >
-                <div className="text-sm font-semibold leading-tight">T.{m}</div>
-                <div className="text-[11px] leading-tight">{nam}</div>
-              </button>
-            ))}
-          </div>
-          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setNam((y) => y + 1)}>
-            Năm tới <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+          <span className="text-sm text-gray-500">Xem theo:</span>
+          {([['thang', 'Một tháng'], ['nhieuThang', 'Nhiều tháng'], ['khoang', 'Khoảng ngày']] as const).map(([v, t]) => (
+            <Button
+              key={v}
+              size="sm"
+              variant={cheDo === v ? 'default' : 'outline'}
+              className={cn('h-8', cheDo === v && 'bg-green-600 hover:bg-green-700')}
+              onClick={() => {
+                if (v === 'nhieuThang' && cheDo === 'thang') setThangChon([khoaThang(nam, thang)]);
+                setCheDo(v);
+              }}
+            >
+              {t}
+            </Button>
+          ))}
+          {cheDo !== 'thang' && (
+            <div className="flex flex-wrap items-center gap-1 md:ml-auto">
+              <span className="text-xs text-gray-500 mr-1">Chọn nhanh:</span>
+              {[1, 2, 3, 4].map((q) => (
+                <Button key={q} size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => chonNhanh([1, 2, 3].map((i) => [nam, (q - 1) * 3 + i] as [number, number]))}>
+                  Quý {q}/{nam}
+                </Button>
+              ))}
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => chonNhanh(MONTHS.map((m) => [nam, m] as [number, number]))}>Cả năm {nam}</Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => chonNhanh(thangGanNhat(3))}>3 tháng gần nhất</Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => chonNhanh(thangGanNhat(6))}>6 tháng gần nhất</Button>
+            </div>
+          )}
         </div>
+
+        {cheDo === 'khoang' ? (
+          <div className="flex flex-wrap items-end gap-3 px-3 py-3">
+            <div className="space-y-1">
+              <Label htmlFor="tc-tu" className="text-xs">Từ ngày</Label>
+              <Input id="tc-tu" type="date" value={tuNgay} max={denNgay} onChange={(e) => setTuNgay(e.target.value)} className="h-9 w-[170px]" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="tc-den" className="text-xs">Đến ngày</Label>
+              <Input id="tc-den" type="date" value={denNgay} min={tuNgay} onChange={(e) => setDenNgay(e.target.value)} className="h-9 w-[170px]" />
+            </div>
+            {tuNgay > denNgay && <p className="text-xs text-red-600 pb-2">Ngày bắt đầu phải trước ngày kết thúc</p>}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto">
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setNam((y) => y - 1)}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Năm trước
+            </Button>
+            <div className="flex gap-1">
+              {MONTHS.map((m) => {
+                const chon = cheDo === 'thang' ? m === thang : thangChon.includes(khoaThang(nam, m));
+                return (
+                  <button
+                    key={m}
+                    onClick={() => (cheDo === 'thang' ? setThang(m) : toggleThang(m))}
+                    aria-pressed={chon}
+                    className={cn(
+                      'shrink-0 px-3 py-1.5 rounded-md text-center transition-colors min-w-[58px]',
+                      chon
+                        ? 'bg-green-50 border-2 border-green-500 text-green-700'
+                        : 'border-2 border-transparent hover:bg-gray-50 text-gray-600',
+                    )}
+                  >
+                    <div className="text-sm font-semibold leading-tight">
+                      {cheDo === 'nhieuThang' && chon ? <Check className="inline h-3 w-3 mr-0.5 -mt-0.5" /> : null}T.{m}
+                    </div>
+                    <div className="text-[11px] leading-tight">{nam}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setNam((y) => y + 1)}>
+              Năm tới <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        )}
+        {cheDo === 'nhieuThang' && (
+          <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2 text-xs text-gray-600">
+            <span>Đã chọn {thangChon.length} tháng{thangChon.length ? ':' : ' — bấm vào tháng để chọn'}</span>
+            {[...thangChon].sort().map((k) => (
+              <Badge key={k} variant="outline" className="gap-1">
+                T.{nhanThang(k)}
+                <button type="button" onClick={() => setThangChon((ds) => ds.filter((x) => x !== k))} aria-label={`Bỏ tháng ${nhanThang(k)}`}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+            {thangChon.length > 0 && (
+              <button type="button" className="text-gray-500 hover:underline" onClick={() => setThangChon([])}>Bỏ chọn hết</button>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Title + building selector */}
@@ -240,7 +368,7 @@ export default function ThuChiPage() {
             Khoản thu / chi - tổng kết {buildingLabel}
           </h1>
           <p className="text-xs md:text-sm text-gray-600">
-            Thống kê các khoản thu / chi tháng {thang}/{nam}
+            Thống kê các khoản thu / chi {nhanKy}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 w-full lg:w-auto">
@@ -393,10 +521,53 @@ export default function ThuChiPage() {
         </Button>
       </div>
 
+      {/* Tổng hợp theo tháng */}
+      {cheDo !== 'thang' && theoThang.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Tổng hợp theo tháng</CardTitle>
+            <CardDescription>{nhanKy} · theo bộ lọc đang chọn</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tháng</TableHead>
+                    <TableHead className="text-right">Số phiếu</TableHead>
+                    <TableHead className="text-right">Tổng thu</TableHead>
+                    <TableHead className="text-right">Tổng chi</TableHead>
+                    <TableHead className="text-right">Lợi nhuận</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {theoThang.map((r) => (
+                    <TableRow key={r.k}>
+                      <TableCell className="font-medium">T.{nhanThang(r.k)}</TableCell>
+                      <TableCell className="text-right">{r.soPhieu}</TableCell>
+                      <TableCell className="text-right text-green-600">{fmtVND(r.thu)}</TableCell>
+                      <TableCell className="text-right text-red-600">{fmtVND(r.chi)}</TableCell>
+                      <TableCell className={cn('text-right font-semibold', r.loiNhuan >= 0 ? 'text-blue-600' : 'text-orange-600')}>{fmtVND(r.loiNhuan)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell>Tổng cộng</TableCell>
+                    <TableCell className="text-right">{filtered.length}</TableCell>
+                    <TableCell className="text-right text-green-600">{fmtVND(stats.tongThu)}</TableCell>
+                    <TableCell className="text-right text-red-600">{fmtVND(stats.tongChi)}</TableCell>
+                    <TableCell className={cn('text-right', stats.loiNhuan >= 0 ? 'text-blue-600' : 'text-orange-600')}>{fmtVND(stats.loiNhuan)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Chi tiết thu / chi tháng {thang}/{nam}</CardTitle>
+          <CardTitle>Chi tiết thu / chi {nhanKy}</CardTitle>
           <CardDescription>{filtered.length} phiếu</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -530,7 +701,7 @@ function PhieuFormDialog({
   const dmOfLoai = danhMucList.filter((d) => d.loai === loai);
 
   const [submitting, setSubmitting] = useState(false);
-  const [soTien, setSoTien] = useState<string>(phieu ? String(phieu.soTien) : '');
+  const [soTien, setSoTien] = useState<number | null>(phieu ? phieu.soTien : null);
   const [phuongThuc, setPhuongThuc] = useState<PhuongThucThuChi>(phieu?.phuongThuc || 'tienMat');
   const [nguoiThanhToan, setNguoiThanhToan] = useState(phieu?.nguoiThanhToan || '');
   const [noiDung, setNoiDung] = useState(phieu?.noiDung || '');
@@ -549,7 +720,7 @@ function PhieuFormDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const soTienNum = parseFloat(soTien);
+    const soTienNum = soTien ?? NaN;
     if (!Number.isFinite(soTienNum) || soTienNum <= 0) return toast.error('Nhập số tiền hợp lệ');
     if (!nguoiThanhToan.trim()) return toast.error('Nhập người thanh toán');
     if (!noiDung.trim()) return toast.error('Nhập nội dung thanh toán');
@@ -607,12 +778,12 @@ function PhieuFormDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Nhập số tiền {isThu ? 'thu' : 'chi'} <span className="text-red-500">*</span></Label>
-            <Input
-              type="number" min={0} step={1000}
+            <MoneyInput
               value={soTien}
-              onChange={(e) => setSoTien(e.target.value)}
+              onChange={setSoTien}
               placeholder="0"
               autoFocus
+              aria-label={`Số tiền ${isThu ? 'thu' : 'chi'}`}
             />
           </div>
 

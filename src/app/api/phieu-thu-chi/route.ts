@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { taoNgayVN } from '@/lib/ky-thu';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
@@ -30,17 +31,31 @@ export async function GET(request: NextRequest) {
   const nam = parseInt(searchParams.get('nam') || '', 10);
   const loai = searchParams.get('loai') || '';
   const toaNha = searchParams.get('toaNha') || '';
+  // Nhiều tháng: thangs=2026-09,2026-10 · Khoảng ngày: tuNgay=2026-09-01&denNgay=2026-11-30 (cả hai ngày, giờ VN)
+  const thangs = (searchParams.get('thangs') || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const tuNgay = searchParams.get('tuNgay') || '';
+  const denNgay = searchParams.get('denNgay') || '';
 
   const query: Record<string, unknown> = {};
+  const khoangThang = (n: number, t: number) => ({ ngayLapPhieu: { $gte: taoNgayVN(n, t, 1), $lt: taoNgayVN(n, t + 1, 1) } });
+  const NGAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-  if (Number.isFinite(thang) && Number.isFinite(nam) && thang >= 1 && thang <= 12) {
-    const start = new Date(nam, thang - 1, 1, 0, 0, 0, 0);
-    const end = new Date(nam, thang, 0, 23, 59, 59, 999);
-    query.ngayLapPhieu = { $gte: start, $lte: end };
+  if (thangs.length) {
+    const ds = thangs.map((x) => /^(\d{4})-(\d{1,2})$/.exec(x)).filter((m): m is RegExpExecArray => Boolean(m))
+      .map((m) => ({ n: Number(m[1]), t: Number(m[2]) })).filter(({ n, t }) => n >= 2000 && t >= 1 && t <= 12);
+    if (!ds.length || ds.length > 120) return NextResponse.json({ message: 'Danh sách tháng không hợp lệ' }, { status: 400 });
+    query.$or = ds.map(({ n, t }) => khoangThang(n, t));
+  } else if (tuNgay || denNgay) {
+    const a = NGAY.exec(tuNgay); const b = NGAY.exec(denNgay);
+    if (!a || !b) return NextResponse.json({ message: 'Khoảng ngày không hợp lệ (YYYY-MM-DD)' }, { status: 400 });
+    const tu = taoNgayVN(Number(a[1]), Number(a[2]), Number(a[3]));
+    const den = taoNgayVN(Number(b[1]), Number(b[2]), Number(b[3]) + 1);
+    if (den <= tu) return NextResponse.json({ message: 'Ngày bắt đầu phải trước ngày kết thúc' }, { status: 400 });
+    query.ngayLapPhieu = { $gte: tu, $lt: den };
+  } else if (Number.isFinite(thang) && Number.isFinite(nam) && thang >= 1 && thang <= 12) {
+    Object.assign(query, khoangThang(nam, thang));
   } else if (Number.isFinite(nam)) {
-    const start = new Date(nam, 0, 1, 0, 0, 0, 0);
-    const end = new Date(nam, 11, 31, 23, 59, 59, 999);
-    query.ngayLapPhieu = { $gte: start, $lte: end };
+    query.ngayLapPhieu = { $gte: taoNgayVN(nam, 1, 1), $lt: taoNgayVN(nam + 1, 1, 1) };
   }
 
   if (loai === 'thu' || loai === 'chi') query.loai = loai;
