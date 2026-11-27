@@ -353,6 +353,8 @@ export interface PhieuThuChi {
   ngayLapPhieu: Date | string;
   tuDongTaoHangThang: boolean;
   toaNha?: string | { _id: string; tenToaNha: string } | null;
+  /** Phiếu thu tự tạo từ một lần thu tiền khách */
+  thanhToan?: string | null;
   nguoiTao?: string | null;
   ngayTao?: Date | string;
   ngayCapNhat?: Date | string;

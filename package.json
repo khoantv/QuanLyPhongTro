@@ -11,7 +11,8 @@
     "db:backup": "bash scripts/db-backup.sh",
     "db:restore": "bash scripts/db-restore.sh",
     "test": "vitest run",
-    "db:migrate-cong-no": "tsx --env-file=.env.local scripts/migrate-cong-no.ts"
+    "db:migrate-cong-no": "tsx --env-file=.env.local scripts/migrate-cong-no.ts",
+    "db:tao-phieu-thu": "tsx --env-file=.env.local scripts/tao-phieu-thu-tu-thanh-toan.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

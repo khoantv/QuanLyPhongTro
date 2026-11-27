@@ -439,6 +439,11 @@ export default function ThuChiPage() {
                       {p.loai === 'thu' ? '+' : '-'}{fmtVND(p.soTien)}
                     </TableCell>
                     <TableCell className="text-right">
+                      {p.thanhToan ? (
+                        <Badge variant="outline" className="text-xs whitespace-nowrap" title="Tự tạo khi thu tiền khách — sửa / xóa ở trang Thanh toán">
+                          Từ thanh toán
+                        </Badge>
+                      ) : (
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => setEditingPhieu(p)}>
                           <Edit className="h-4 w-4" />
@@ -451,6 +456,7 @@ export default function ThuChiPage() {
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         />
                       </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

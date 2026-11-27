@@ -215,6 +215,7 @@ export function ThuTienForm({
       toast.success(dangSua ? 'Đã cập nhật thanh toán' : 'Đã ghi nhận thanh toán', {
         description: kq.soDu !== undefined ? `Số dư công nợ: ${moTaSoDu(kq.soDu)}` : undefined,
       });
+      if (r.canhBao) toast.warning(r.canhBao);
       onSuccess(kq);
     } catch (err) {
       console.error(err);

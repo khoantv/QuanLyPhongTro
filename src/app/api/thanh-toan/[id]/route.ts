@@ -4,6 +4,7 @@ import ThanhToan from '@/models/ThanhToan';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { capNhatThanhToan, huyThanhToan } from '@/lib/cong-no';
+import { dongBoPhieuThuAnToan, xoaPhieuThu } from '@/lib/phieu-thu-tu-dong';
 import { resolveThanhToanInput, ThanhToanInputError } from '@/lib/cong-no/thanh-toan-input';
 
 type Params = { params: Promise<{ id: string }> };
@@ -53,6 +54,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       xuLyTienThua,
       session.user.id,
     );
+    const canhBaoPhieuThu = await dongBoPhieuThuAnToan(thanhToan._id);
 
     const xuLyLuu = congNo.tienThua > 0 ? (xuLyTienThua ?? 'truKySau') : null;
     if (thanhToan.xuLyTienThua !== xuLyLuu) {
@@ -70,6 +72,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       success: true,
       data: thanhToan,
       congNo: { soDu: congNo.soDu, tienThua: congNo.tienThua },
+      ...(canhBaoPhieuThu ? { canhBao: canhBaoPhieuThu } : {}),
       message: 'Cập nhật thanh toán thành công'
     });
   } catch (error) {
@@ -98,6 +101,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       await huyThanhToan({ _id: thanhToan._id, khachThue: thanhToan.khachThue }, session.user.id);
     }
     await ThanhToan.findByIdAndDelete(id);
+    await xoaPhieuThu(thanhToan._id);
 
     return NextResponse.json({ success: true, message: 'Xóa thanh toán thành công' });
   } catch (error) {

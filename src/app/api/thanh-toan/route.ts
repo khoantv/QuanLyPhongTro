@@ -5,6 +5,7 @@ import HoaDon from '@/models/HoaDon';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ghiNhanThanhToan } from '@/lib/cong-no';
+import { dongBoPhieuThuAnToan } from '@/lib/phieu-thu-tu-dong';
 import { resolveThanhToanInput, ThanhToanInputError } from '@/lib/cong-no/thanh-toan-input';
 
 // GET - Lấy danh sách thanh toán
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
       session.user.id,
       input.ghiChu ? `Thu tiền — ${input.ghiChu}` : 'Thu tiền',
     );
+    const canhBaoPhieuThu = await dongBoPhieuThuAnToan(thanhToan._id);
 
     // Chỉ lưu lựa chọn xử lý tiền thừa khi thực sự có phần thừa
     const xuLyTienThua = congNo.tienThua > 0 ? (input.xuLyTienThua ?? 'truKySau') : null;
@@ -138,6 +140,7 @@ export async function POST(request: NextRequest) {
         hoaDon: updatedHoaDon,
         congNo: { soDu: congNo.soDu, tienThua: congNo.tienThua },
       },
+      ...(canhBaoPhieuThu ? { canhBao: canhBaoPhieuThu } : {}),
       message: 'Tạo thanh toán thành công'
     });
   } catch (error) {

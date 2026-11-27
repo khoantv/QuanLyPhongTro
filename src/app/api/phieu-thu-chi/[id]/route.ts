@@ -19,6 +19,13 @@ const phieuSchema = z.object({
   toaNha: z.string().nullable().optional(),
 });
 
+/** Phiếu thu tự tạo từ thanh toán chỉ sửa / xóa qua trang Thanh toán để hai bên luôn khớp. */
+async function laPhieuTuDong(id: string) {
+  const p = await PhieuThuChi.findById(id).select('thanhToan').lean<{ thanhToan?: unknown } | null>();
+  return Boolean(p?.thanhToan);
+}
+const THONG_BAO_TU_DONG = 'Phiếu thu này tự tạo từ một lần thu tiền khách — hãy sửa / xóa ở trang Thanh toán';
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -48,6 +55,7 @@ export async function PUT(
 
     await dbConnect();
     const { id } = await params;
+    if (await laPhieuTuDong(id)) return NextResponse.json({ message: THONG_BAO_TU_DONG }, { status: 400 });
 
     const danhMuc = await DanhMucThuChi.findById(data.danhMuc);
     if (!danhMuc) return NextResponse.json({ message: 'Danh mục không tồn tại' }, { status: 400 });
@@ -98,6 +106,7 @@ export async function DELETE(
 
   await dbConnect();
   const { id } = await params;
+  if (await laPhieuTuDong(id)) return NextResponse.json({ message: THONG_BAO_TU_DONG }, { status: 400 });
   const deleted = await PhieuThuChi.findByIdAndDelete(id);
   if (!deleted) return NextResponse.json({ message: 'Phiếu không tồn tại' }, { status: 404 });
   return NextResponse.json({ success: true, message: 'Đã xóa phiếu' });

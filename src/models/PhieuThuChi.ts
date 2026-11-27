@@ -14,6 +14,8 @@ export interface IPhieuThuChi extends Document {
   tuDongTaoHangThang: boolean;
   toaNha?: mongoose.Types.ObjectId | null;
   nguoiTao?: mongoose.Types.ObjectId | null;
+  /** Phiếu thu tự tạo khi thu tiền khách — sửa / xóa ở trang Thanh toán */
+  thanhToan?: mongoose.Types.ObjectId | null;
   ngayTao: Date;
   ngayCapNhat: Date;
 }
@@ -71,6 +73,11 @@ const PhieuThuChiSchema = new Schema<IPhieuThuChi>({
     ref: 'NguoiDung',
     default: null,
   },
+  thanhToan: {
+    type: Schema.Types.ObjectId,
+    ref: 'ThanhToan',
+    default: null,
+  },
 }, {
   timestamps: { createdAt: 'ngayTao', updatedAt: 'ngayCapNhat' },
 });
@@ -80,6 +87,8 @@ PhieuThuChiSchema.index({ danhMuc: 1 });
 PhieuThuChiSchema.index({ toaNha: 1 });
 PhieuThuChiSchema.index({ ngayLapPhieu: -1 });
 PhieuThuChiSchema.index({ phuongThuc: 1 });
+// Mỗi thanh toán tối đa một phiếu thu tự động
+PhieuThuChiSchema.index({ thanhToan: 1 }, { unique: true, partialFilterExpression: { thanhToan: { $type: 'objectId' } } });
 
 export default mongoose.models.PhieuThuChi
   || mongoose.model<IPhieuThuChi>('PhieuThuChi', PhieuThuChiSchema);
